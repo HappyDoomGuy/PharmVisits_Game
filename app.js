@@ -167,6 +167,34 @@ function lockRemainingPharmacies() {
   });
 }
 
+function getTelegramUserId() {
+  const id = Number(telegramApp?.initDataUnsafe?.user?.id);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+async function saveLevelScore({ level, points, name }) {
+  const telegramId = getTelegramUserId();
+  if (!telegramId) return;
+
+  const apiUrl = window.PHARM_CONFIG?.scoreApiUrl || "/api/score";
+
+  try {
+    await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        telegramId,
+        name: name || "",
+        level: String(level),
+        points: Number(points) || 0,
+      }),
+      keepalive: true,
+    });
+  } catch (error) {
+    console.warn("[PharmConsilium] failed to save score", error);
+  }
+}
+
 function finishRound() {
   if (resultsShown) return;
   resultsShown = true;
@@ -189,6 +217,12 @@ function finishRound() {
   if (hasNext) {
     resultsNextBtn.textContent = `Перейти к ${nextMeta.name}`;
   }
+
+  void saveLevelScore({
+    level: currentLevel,
+    points: totalPoints,
+    name: playerName,
+  });
 
   showScreen("results");
 }
