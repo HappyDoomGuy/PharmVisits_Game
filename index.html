@@ -7,9 +7,9 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
     />
     <meta name="color-scheme" content="light only" />
-    <meta name="theme-color" content="#dce6f0" />
-    <meta name="theme-color" content="#dce6f0" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#dce6f0" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#d7e4f2" />
+    <meta name="theme-color" content="#d7e4f2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#d7e4f2" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="supported-color-schemes" content="light" />
@@ -23,7 +23,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=4" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
@@ -102,8 +102,29 @@
             />
           </label>
           <button class="btn btn-primary" type="submit">Старт</button>
-          <a class="btn btn-secondary welcome-results-btn" href="./dashboard.html?v=2">Посмотреть результаты</a>
+          <button class="btn btn-secondary welcome-results-btn" type="button" id="welcome-results-btn">
+            Посмотреть результаты
+          </button>
         </form>
+      </section>
+
+      <section class="screen screen-dashboard" id="dashboard" aria-label="Результаты" hidden>
+        <header class="dashboard-header">
+          <p class="greeting">PharmConsilium</p>
+          <div class="levels-row">
+            <button class="btn-back" type="button" id="dashboard-back-btn" aria-label="Назад к игре">
+              <span aria-hidden="true">←</span>
+            </button>
+            <h1 class="levels-title">Результаты</h1>
+            <button class="btn-back dashboard-refresh" type="button" id="dashboard-refresh-btn" aria-label="Обновить">
+              <span aria-hidden="true">↻</span>
+            </button>
+          </div>
+          <p class="dashboard-meta" id="dashboard-meta">Загрузка…</p>
+        </header>
+
+        <div class="dashboard-tabs" id="dashboard-tabs" role="tablist" aria-label="Уровни"></div>
+        <div class="dashboard-panel" id="dashboard-panel"></div>
       </section>
 
       <section class="screen screen-levels" id="levels" aria-label="Уровни" hidden>
@@ -252,7 +273,7 @@
       </section>
     </main>
 
-    <script src="config.js"></script>
-    <script src="app.js"></script>
+    <script src="config.js?v=4"></script>
+    <script src="app.js?v=4"></script>
   </body>
 </html>

@@ -8,7 +8,7 @@ const LEVELS = {
 };
 
 const ASSET_URLS = ["pharmacy.png", "polyclinic.png", "logo.png"];
-const TG_BG = "#dce6f0";
+const TG_BG = "#d7e4f2";
 
 function preloadAssets(urls) {
   return Promise.all(
@@ -87,6 +87,7 @@ function getTelegramUserName() {
 
 const screens = {
   welcome: document.getElementById("welcome"),
+  dashboard: document.getElementById("dashboard"),
   levels: document.getElementById("levels"),
   briefing: document.getElementById("briefing"),
   play: document.getElementById("play"),
@@ -736,3 +737,206 @@ nameInput.addEventListener("change", () => {
   const value = formatName(nameInput.value);
   if (value) sessionStorage.setItem("pharmconsilium-name", value);
 });
+
+/* —— Dashboard (results by level) —— */
+const DASH_LEVEL_LABELS = {
+  1: "I",
+  "1-1": "I-I",
+  2: "II",
+  "2-1": "II-I",
+  3: "III",
+  "3-1": "III-I",
+};
+const DASH_LEVEL_ORDER = ["1", "1-1", "2", "2-1", "3", "3-1"];
+
+const welcomeResultsBtn = document.getElementById("welcome-results-btn");
+const dashboardBackBtn = document.getElementById("dashboard-back-btn");
+const dashboardTabsEl = document.getElementById("dashboard-tabs");
+const dashboardPanelEl = document.getElementById("dashboard-panel");
+const dashboardMetaEl = document.getElementById("dashboard-meta");
+const dashboardRefreshBtn = document.getElementById("dashboard-refresh-btn");
+
+let dashActiveLevel = "1";
+let dashStatsCache = null;
+
+function dashLevelLabel(level) {
+  return DASH_LEVEL_LABELS[String(level)] || String(level);
+}
+
+function dashLevelTitle(level) {
+  return `Уровень ${dashLevelLabel(level)}`;
+}
+
+function dashFormatDate(value) {
+  if (!value) return "—";
+  const normalized = String(value).includes("T") ? value : `${value.replace(" ", "T")}Z`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function dashEscapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function dashMedalClass(index) {
+  if (index === 0) return "is-gold";
+  if (index === 1) return "is-silver";
+  if (index === 2) return "is-bronze";
+  return "";
+}
+
+async function fetchDashboardStats() {
+  const apiUrl = window.PHARM_CONFIG?.statsApiUrl || "/api/stats";
+  const response = await fetch(apiUrl, { method: "GET" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Ошибка ${response.status}`);
+  }
+  return data;
+}
+
+function renderDashboardTabs(byLevel) {
+  const levels = DASH_LEVEL_ORDER.filter((level) => (byLevel[level] || []).length > 0);
+  const extra = Object.keys(byLevel).filter((level) => !DASH_LEVEL_ORDER.includes(level));
+  const all = [...levels, ...extra.sort()];
+
+  if (!all.length) {
+    dashboardTabsEl.innerHTML = "";
+    dashActiveLevel = "";
+    return;
+  }
+
+  if (!all.includes(dashActiveLevel)) dashActiveLevel = all[0];
+
+  dashboardTabsEl.innerHTML = all
+    .map((level) => {
+      const count = (byLevel[level] || []).length;
+      const selected = level === dashActiveLevel ? "is-active" : "";
+      return `<button class="dashboard-tab ${selected}" type="button" data-level="${level}" role="tab" aria-selected="${level === dashActiveLevel}">
+        <span class="dashboard-tab-label">${dashEscapeHtml(dashLevelLabel(level))}</span>
+        <span class="dashboard-tab-count">${count}</span>
+      </button>`;
+    })
+    .join("");
+}
+
+function renderDashboardPanel(byLevel) {
+  if (!dashActiveLevel) {
+    dashboardPanelEl.innerHTML = `<div class="dashboard-empty">
+      <p class="dashboard-empty-title">Пока пусто</p>
+      <p class="dashboard-empty-text">Результаты появятся после прохождения уровней в Telegram.</p>
+    </div>`;
+    return;
+  }
+
+  const rows = byLevel[dashActiveLevel] || [];
+  if (!rows.length) {
+    dashboardPanelEl.innerHTML = `<div class="dashboard-empty">
+      <p class="dashboard-empty-title">Нет результатов</p>
+      <p class="dashboard-empty-text">Для ${dashEscapeHtml(dashLevelTitle(dashActiveLevel))} ещё нет записей.</p>
+    </div>`;
+    return;
+  }
+
+  dashboardPanelEl.innerHTML = `
+    <div class="dashboard-level-head">
+      <p class="dashboard-level-kicker">Рейтинг</p>
+      <h2 class="dashboard-level-title">${dashEscapeHtml(dashLevelTitle(dashActiveLevel))}</h2>
+    </div>
+    <ul class="dashboard-list" role="list">
+      ${rows
+        .map(
+          (row, index) => `
+        <li class="dashboard-row ${dashMedalClass(index)}">
+          <span class="dashboard-rank" aria-hidden="true">${index + 1}</span>
+          <div class="dashboard-row-main">
+            <p class="dashboard-name">${dashEscapeHtml(row.player_name || "Игрок")}</p>
+            <p class="dashboard-date">${dashEscapeHtml(dashFormatDate(row.played_at))}</p>
+          </div>
+          <div class="dashboard-score-block">
+            <span class="dashboard-score">${dashEscapeHtml(row.points)}</span>
+            <span class="dashboard-score-unit">очков</span>
+          </div>
+        </li>`
+        )
+        .join("")}
+    </ul>
+  `;
+}
+
+function renderDashboardStats(data) {
+  dashStatsCache = data;
+  const byLevel = data.byLevel || {};
+  const total = (data.rows || []).length;
+  dashboardMetaEl.textContent = total ? `${total} записей` : "Записей пока нет";
+  renderDashboardTabs(byLevel);
+  renderDashboardPanel(byLevel);
+}
+
+async function loadDashboard() {
+  dashboardMetaEl.textContent = "Загрузка…";
+  dashboardRefreshBtn.classList.add("is-spinning");
+  dashboardPanelEl.innerHTML = `<div class="dashboard-empty">
+    <p class="dashboard-empty-title">Загрузка…</p>
+    <p class="dashboard-empty-text">Собираем результаты игроков</p>
+  </div>`;
+
+  try {
+    const data = await fetchDashboardStats();
+    renderDashboardStats(data);
+  } catch (error) {
+    dashboardMetaEl.textContent = "Ошибка загрузки";
+    dashboardPanelEl.innerHTML = `<div class="dashboard-empty">
+      <p class="dashboard-empty-title">Не удалось загрузить</p>
+      <p class="dashboard-empty-text">${dashEscapeHtml(error.message || "Попробуйте обновить")}</p>
+    </div>`;
+  } finally {
+    dashboardRefreshBtn.classList.remove("is-spinning");
+  }
+}
+
+function openDashboard() {
+  document.body.classList.add("welcome-settled");
+  showScreen("dashboard");
+  void loadDashboard();
+}
+
+welcomeResultsBtn.addEventListener("click", () => {
+  openDashboard();
+});
+
+dashboardBackBtn.addEventListener("click", () => {
+  showScreen("welcome");
+  nameInput.focus();
+});
+
+dashboardTabsEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-level]");
+  if (!btn || !dashStatsCache) return;
+  dashActiveLevel = btn.dataset.level;
+  renderDashboardTabs(dashStatsCache.byLevel || {});
+  renderDashboardPanel(dashStatsCache.byLevel || {});
+});
+
+dashboardRefreshBtn.addEventListener("click", () => {
+  void loadDashboard();
+});
+
+if (location.hash === "#dashboard") {
+  openDashboard();
+  history.replaceState(null, "", location.pathname + location.search);
+}
+
+window.setTimeout(() => {
+  document.body.classList.add("welcome-settled");
+}, 4500);

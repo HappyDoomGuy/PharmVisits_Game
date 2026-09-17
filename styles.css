@@ -5,14 +5,14 @@
   --mint: #7eb8e0;
   --teal: #2a6f9e;
   --teal-deep: #0b2f4a;
-  --sand: #e2e0d8;
+  --sand: #d9e4ef;
   --glow: rgba(126, 184, 224, 0.45);
   --danger-soft: #c96b5a;
   --radius: 1.25rem;
   --shadow: 0 18px 40px rgba(11, 47, 74, 0.14);
   --font-display: "Fraunces", Georgia, serif;
   --font-ui: "Sora", system-ui, sans-serif;
-  --page-bg: #dce6f0;
+  --page-bg: #d7e4f2;
   color-scheme: only light;
 }
 
@@ -72,11 +72,11 @@ body::before {
   left: calc(-1 * env(safe-area-inset-left, 0px) - 20px);
   background-color: var(--page-bg);
   background-image:
-    radial-gradient(90% 55% at 8% 0%, rgba(159, 210, 235, 0.7) 0%, transparent 58%),
-    radial-gradient(70% 45% at 100% 8%, rgba(184, 210, 228, 0.65) 0%, transparent 55%),
-    radial-gradient(55% 40% at 70% 100%, rgba(226, 222, 210, 0.45) 0%, transparent 60%),
-    radial-gradient(40% 30% at 20% 85%, rgba(126, 184, 224, 0.28) 0%, transparent 70%),
-    linear-gradient(165deg, #f3f7fb 0%, #e4eef5 38%, #d5e4f0 72%, #c8d6e6 100%);
+    radial-gradient(90% 55% at 8% 0%, rgba(140, 190, 230, 0.75) 0%, transparent 58%),
+    radial-gradient(70% 45% at 100% 8%, rgba(160, 200, 235, 0.7) 0%, transparent 55%),
+    radial-gradient(55% 40% at 70% 100%, rgba(180, 210, 235, 0.5) 0%, transparent 60%),
+    radial-gradient(40% 30% at 20% 85%, rgba(100, 170, 220, 0.32) 0%, transparent 70%),
+    linear-gradient(165deg, #f2f7fc 0%, #e2eef8 38%, #d0e2f2 72%, #c0d6ea 100%);
 }
 
 button,
@@ -125,7 +125,7 @@ input {
   height: min(55vw, 20rem);
   bottom: 8%;
   left: 28%;
-  background: radial-gradient(circle, rgba(226, 222, 210, 0.4), transparent 70%);
+  background: radial-gradient(circle, rgba(170, 205, 235, 0.45), transparent 70%);
   animation-delay: -11s;
 }
 
@@ -143,7 +143,7 @@ input {
   max-height: 280px;
   top: -8%;
   right: -12%;
-  background: radial-gradient(circle at 30% 30%, #9ecceb, transparent 70%);
+  background: radial-gradient(circle at 30% 30%, #8ec4ea, transparent 70%);
   opacity: 0.85;
 }
 
@@ -154,7 +154,7 @@ input {
   max-height: 340px;
   bottom: 8%;
   left: -28%;
-  background: radial-gradient(circle at 60% 40%, #b7cce0, transparent 68%);
+  background: radial-gradient(circle at 60% 40%, #a8c8e4, transparent 68%);
   animation-delay: -4s;
   opacity: 0.7;
 }
@@ -166,7 +166,7 @@ input {
   max-height: 180px;
   bottom: 22%;
   right: -8%;
-  background: radial-gradient(circle at 40% 40%, var(--sand), transparent 72%);
+  background: radial-gradient(circle at 40% 40%, #c5d9ec, transparent 72%);
   animation-delay: -8s;
   opacity: 0.55;
 }
@@ -825,6 +825,30 @@ html.is-telegram .app {
   text-align: center;
   opacity: 0;
   animation: welcomeFormIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 3.42s both;
+}
+
+body.welcome-settled .welcome-logo-stage,
+body.welcome-settled .welcome-form .field,
+body.welcome-settled .welcome-form .btn-primary,
+body.welcome-settled .welcome-form .welcome-results-btn,
+body.welcome-settled .brand-word,
+body.welcome-settled .brand-pharm .brand-letter,
+body.welcome-settled .brand-consilium,
+body.welcome-settled .brand-consilium .brand-letter {
+  opacity: 1 !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+body.welcome-settled .brand-word {
+  transform: none !important;
+}
+
+body.welcome-settled .brand-pharm .brand-letter,
+body.welcome-settled .brand-consilium .brand-letter {
+  color: var(--teal-deep);
+  background-image: none;
+  -webkit-text-fill-color: var(--teal-deep);
 }
 
 @keyframes welcomeFormIn {
