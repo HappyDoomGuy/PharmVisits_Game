@@ -8,6 +8,7 @@ const LEVELS = {
 };
 
 const ASSET_URLS = ["pharmacy.png", "polyclinic.png", "logo.png"];
+const TG_BG = "#dce6f0";
 
 function preloadAssets(urls) {
   return Promise.all(
@@ -25,6 +26,64 @@ function preloadAssets(urls) {
 }
 
 preloadAssets(ASSET_URLS);
+
+function getTelegramWebApp() {
+  return window.Telegram?.WebApp || null;
+}
+
+function isTelegramWebApp() {
+  const tg = getTelegramWebApp();
+  if (!tg) return false;
+  return Boolean(tg.initData) || Boolean(tg.initDataUnsafe?.user);
+}
+
+function syncTelegramViewport(tg) {
+  const height = tg.viewportStableHeight || tg.viewportHeight || window.innerHeight;
+  document.documentElement.style.setProperty("--tg-viewport-stable-height", `${height}px`);
+}
+
+function setupTelegramWebApp() {
+  const tg = getTelegramWebApp();
+  if (!tg || !isTelegramWebApp()) return null;
+
+  document.documentElement.classList.add("is-telegram");
+  document.body.classList.add("is-telegram");
+
+  tg.ready();
+  tg.expand();
+
+  try {
+    tg.setHeaderColor?.(TG_BG);
+    tg.setBackgroundColor?.(TG_BG);
+  } catch (_) {
+    /* older clients */
+  }
+
+  if (typeof tg.disableVerticalSwipes === "function") {
+    tg.disableVerticalSwipes();
+  }
+
+  syncTelegramViewport(tg);
+  tg.onEvent?.("viewportChanged", () => syncTelegramViewport(tg));
+  tg.onEvent?.("themeChanged", () => {
+    try {
+      tg.setHeaderColor?.(TG_BG);
+      tg.setBackgroundColor?.(TG_BG);
+    } catch (_) {
+      /* ignore */
+    }
+  });
+
+  return tg;
+}
+
+const telegramApp = setupTelegramWebApp();
+
+function getTelegramUserName() {
+  const user = telegramApp?.initDataUnsafe?.user;
+  if (!user) return "";
+  return [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+}
 
 const screens = {
   welcome: document.getElementById("welcome"),
@@ -634,6 +693,9 @@ briefingBackBtn.addEventListener("click", goToLevels);
 const saved = sessionStorage.getItem("pharmconsilium-name");
 if (saved) {
   nameInput.value = saved;
+} else {
+  const tgName = getTelegramUserName();
+  if (tgName) nameInput.value = tgName;
 }
 
 nameInput.addEventListener("change", () => {

@@ -426,6 +426,36 @@ input {
   flex-direction: column;
 }
 
+html.is-telegram,
+html.is-telegram body {
+  min-height: var(--tg-viewport-stable-height, 100dvh);
+  overscroll-behavior: none;
+}
+
+html.is-telegram .app {
+  min-height: var(--tg-viewport-stable-height, 100dvh);
+  padding-top: max(
+    1.25rem,
+    env(safe-area-inset-top),
+    var(--tg-content-safe-area-inset-top, 0px)
+  );
+  padding-right: max(
+    1.25rem,
+    env(safe-area-inset-right),
+    var(--tg-content-safe-area-inset-right, 0px)
+  );
+  padding-bottom: max(
+    1.5rem,
+    env(safe-area-inset-bottom),
+    var(--tg-content-safe-area-inset-bottom, 0px)
+  );
+  padding-left: max(
+    1.25rem,
+    env(safe-area-inset-left),
+    var(--tg-content-safe-area-inset-left, 0px)
+  );
+}
+
 .screen {
   flex: 1 1 auto;
   display: none;
