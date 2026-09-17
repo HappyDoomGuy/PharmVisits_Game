@@ -10,6 +10,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>PharmConsilium</title>
+    <link rel="preload" as="image" href="pharmacy.png" />
+    <link rel="preload" as="image" href="polyclinic.png" />
+    <link rel="preload" as="image" href="logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,6 +22,11 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="asset-preload" aria-hidden="true">
+      <img src="pharmacy.png" alt="" width="1" height="1" decoding="async" />
+      <img src="polyclinic.png" alt="" width="1" height="1" decoding="async" />
+      <img src="logo.png" alt="" width="1" height="1" decoding="async" />
+    </div>
     <div class="atmosphere" aria-hidden="true">
       <span class="orb orb-a"></span>
       <span class="orb orb-b"></span>
@@ -28,6 +36,38 @@
 
     <main class="app">
       <section class="screen screen-welcome is-active" id="welcome" aria-label="Старт">
+        <header class="brand-block">
+          <div class="brand-bloom" aria-hidden="true"></div>
+          <div class="welcome-logo" aria-hidden="true">
+            <span class="welcome-logo-stage">
+              <span class="welcome-logo-mark"></span>
+            </span>
+          </div>
+          <h1 class="brand" aria-label="PharmConsilium">
+            <span class="brand-word" aria-hidden="true">
+              <span class="brand-part brand-pharm">
+                <span class="brand-letter" style="--i: 0">P</span>
+                <span class="brand-letter" style="--i: 1">h</span>
+                <span class="brand-letter" style="--i: 2">a</span>
+                <span class="brand-letter" style="--i: 3">r</span>
+                <span class="brand-letter" style="--i: 4">m</span>
+              </span>
+              <span class="brand-part brand-consilium">
+                <span class="brand-letter" style="--i: 0">C</span>
+                <span class="brand-letter" style="--i: 1">o</span>
+                <span class="brand-letter" style="--i: 2">n</span>
+                <span class="brand-letter" style="--i: 3">s</span>
+                <span class="brand-letter" style="--i: 4">i</span>
+                <span class="brand-letter" style="--i: 5">l</span>
+                <span class="brand-letter" style="--i: 6">i</span>
+                <span class="brand-letter" style="--i: 7">u</span>
+                <span class="brand-letter" style="--i: 8">m</span>
+              </span>
+            </span>
+            <span class="brand-sheen" aria-hidden="true"></span>
+          </h1>
+        </header>
+
         <form class="welcome-form" id="start-form" autocomplete="name">
           <label class="field">
             <span class="field-label">Ваше имя</span>
@@ -114,7 +154,13 @@
               <span class="play-timer-value" id="play-timer-value">15</span>
             </div>
             <div class="play-polyclinic" id="play-polyclinic">
-              <img class="play-polyclinic-img" src="polyclinic.png" alt="" />
+              <img
+                class="play-polyclinic-img"
+                src="polyclinic.png"
+                alt=""
+                decoding="async"
+                fetchpriority="high"
+              />
               <span class="play-polyclinic-label">Поликлиника</span>
             </div>
             <div class="play-points" aria-live="polite">

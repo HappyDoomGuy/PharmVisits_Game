@@ -7,6 +7,25 @@ const LEVELS = {
   "3-1": { name: "Уровень III-I", maxPicks: 3, field: "pharmacies", traps: "single2" },
 };
 
+const ASSET_URLS = ["pharmacy.png", "polyclinic.png", "logo.png"];
+
+function preloadAssets(urls) {
+  return Promise.all(
+    urls.map(
+      (url) =>
+        new Promise((resolve) => {
+          const img = new Image();
+          img.decoding = "async";
+          img.onload = () => resolve(url);
+          img.onerror = () => resolve(url);
+          img.src = url;
+        })
+    )
+  );
+}
+
+preloadAssets(ASSET_URLS);
+
 const screens = {
   welcome: document.getElementById("welcome"),
   levels: document.getElementById("levels"),
@@ -419,6 +438,9 @@ function createPharmacySpot({ left, top, isAbove, score, isTrap = false, trapSty
   img.className = "play-pharmacy-img";
   img.src = "pharmacy.png";
   img.alt = "";
+  img.decoding = "async";
+  img.loading = "eager";
+  img.fetchPriority = "high";
 
   const label = document.createElement("span");
   label.className = "play-pharmacy-label";
