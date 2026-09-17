@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
+    />
+    <meta name="theme-color" content="#0B3D3A" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>PharmConsilium</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true">
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="orb orb-c"></span>
+      <span class="grain"></span>
+    </div>
+
+    <main class="app">
+      <section class="screen screen-welcome is-active" id="welcome" aria-label="Старт">
+        <form class="welcome-form" id="start-form" autocomplete="name">
+          <label class="field">
+            <span class="field-label">Ваше имя</span>
+            <input
+              class="field-input"
+              id="player-name"
+              name="playerName"
+              type="text"
+              maxlength="32"
+              placeholder="Как к вам обращаться?"
+              required
+              enterkeyhint="go"
+              autocapitalize="words"
+            />
+          </label>
+          <button class="btn btn-primary" type="submit">Старт</button>
+        </form>
+      </section>
+
+      <section class="screen screen-levels" id="levels" aria-label="Уровни" hidden>
+        <header class="levels-header">
+          <p class="greeting" id="greeting">Здравствуйте</p>
+          <div class="levels-row">
+            <button class="btn-back" type="button" id="back-btn" aria-label="Назад">
+              <span aria-hidden="true">←</span>
+            </button>
+            <h2 class="levels-title">Выбор уровня</h2>
+          </div>
+        </header>
+
+        <div class="level-list" role="list">
+          <button class="level" type="button" data-level="1" role="listitem">
+            <span class="level-index">I</span>
+            <span class="level-body">
+              <span class="level-name">Уровень I</span>
+            </span>
+          </button>
+
+          <button class="level" type="button" data-level="2" role="listitem">
+            <span class="level-index">II</span>
+            <span class="level-body">
+              <span class="level-name">Уровень II</span>
+            </span>
+          </button>
+
+          <button class="level" type="button" data-level="3" role="listitem">
+            <span class="level-index">III</span>
+            <span class="level-body">
+              <span class="level-name">Уровень III</span>
+            </span>
+          </button>
+        </div>
+      </section>
+
+      <section class="screen screen-play" id="play" aria-label="Игра" hidden>
+        <header class="play-header">
+          <button class="btn-back" type="button" id="to-levels-btn" aria-label="К уровням">
+            <span aria-hidden="true">←</span>
+          </button>
+          <div class="play-heading">
+            <h2 class="play-title" id="play-level-title"></h2>
+          </div>
+        </header>
+        <div class="play-arena" id="play-arena">
+          <svg class="play-routes" id="play-routes" aria-hidden="true"></svg>
+          <div class="play-runner" id="play-runner" hidden aria-hidden="true">
+            <span class="play-runner-figure">
+              <span class="play-runner-head">
+                <span class="play-runner-eye play-runner-eye-l"></span>
+                <span class="play-runner-eye play-runner-eye-r"></span>
+                <span class="play-runner-mouth"></span>
+              </span>
+              <span class="play-runner-arm play-runner-arm-l"></span>
+              <span class="play-runner-arm play-runner-arm-r"></span>
+              <span class="play-runner-torso"></span>
+              <span class="play-runner-leg play-runner-leg-l"></span>
+              <span class="play-runner-leg play-runner-leg-r"></span>
+            </span>
+          </div>
+          <div class="play-sky" id="play-sky" aria-live="polite"></div>
+          <div class="play-ground">
+            <div class="play-timer" aria-live="polite">
+              <span class="play-timer-label">Время</span>
+              <span class="play-timer-value" id="play-timer-value">15</span>
+            </div>
+            <div class="play-polyclinic" id="play-polyclinic">
+              <img class="play-polyclinic-img" src="polyclinic.png" alt="" />
+              <span class="play-polyclinic-label">Поликлиника</span>
+            </div>
+            <div class="play-points" aria-live="polite">
+              <span class="play-points-label">Очки</span>
+              <span class="play-points-value" id="play-points-value">0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen screen-briefing" id="briefing" aria-label="Инструкция" hidden>
+        <div class="briefing-card">
+          <p class="briefing-kicker" id="briefing-level"></p>
+          <h2 class="briefing-title">Правила</h2>
+          <p class="briefing-text" id="briefing-text"></p>
+          <p class="briefing-time">На уровень даётся <strong>15 секунд</strong></p>
+          <div class="briefing-actions">
+            <button class="btn btn-primary" type="button" id="briefing-start-btn">Начать</button>
+            <button class="btn btn-secondary" type="button" id="briefing-back-btn">Назад</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen screen-results" id="results" aria-label="Результаты" hidden>
+        <div class="results-card">
+          <p class="results-kicker" id="results-level"></p>
+          <h2 class="results-title">Результаты</h2>
+          <p class="results-score-label">Набрано очков</p>
+          <p class="results-score" id="results-score">0</p>
+          <div class="results-actions">
+            <button class="btn btn-primary" type="button" id="results-next-btn" hidden>
+              Перейти к следующему уровню
+            </button>
+            <button class="btn btn-primary" type="button" id="results-again-btn">Играть снова</button>
+            <button class="btn btn-secondary" type="button" id="results-levels-btn">
+              К выбору уровней
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
