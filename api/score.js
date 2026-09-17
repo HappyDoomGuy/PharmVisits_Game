@@ -96,6 +96,17 @@ export default async function handler(req, res) {
             ],
           },
         },
+        {
+          type: "execute",
+          stmt: {
+            sql: `
+              UPDATE level_scores
+              SET player_name = ?
+              WHERE telegram_id = ?
+            `,
+            args: [tursoArg(playerName), tursoArg(telegramId)],
+          },
+        },
         { type: "close" },
       ],
     }),

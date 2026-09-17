@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
+    />
+    <meta name="color-scheme" content="light only" />
+    <meta name="theme-color" content="#dce6f0" />
+    <meta name="theme-color" content="#dce6f0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#dce6f0" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>PharmConsilium — Результаты</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <link rel="preload" as="image" href="logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=3" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body class="dashboard-page">
+    <div class="atmosphere" aria-hidden="true">
+      <span class="atm-wash atm-wash-a"></span>
+      <span class="atm-wash atm-wash-b"></span>
+      <span class="atm-wash atm-wash-c"></span>
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="orb orb-c"></span>
+      <span class="atm-cross atm-cross-a"></span>
+      <span class="atm-cross atm-cross-b"></span>
+      <span class="atm-capsule atm-capsule-a"></span>
+      <span class="atm-capsule atm-capsule-b"></span>
+      <span class="atm-capsule atm-capsule-c"></span>
+      <span class="atm-bubble" style="--i: 0"></span>
+      <span class="atm-bubble" style="--i: 1"></span>
+      <span class="atm-bubble" style="--i: 2"></span>
+      <span class="atm-bubble" style="--i: 3"></span>
+      <span class="atm-grid"></span>
+      <span class="grain"></span>
+    </div>
+
+    <main class="app dashboard-app">
+      <section class="screen screen-dashboard is-active" id="dashboard" aria-label="Результаты">
+        <header class="dashboard-header">
+          <p class="greeting">PharmConsilium</p>
+          <div class="levels-row">
+            <a class="btn-back" href="./" aria-label="Назад к игре">
+              <span aria-hidden="true">←</span>
+            </a>
+            <h1 class="levels-title">Результаты</h1>
+            <button class="btn-back dashboard-refresh" type="button" id="dashboard-refresh-btn" aria-label="Обновить">
+              <span aria-hidden="true">↻</span>
+            </button>
+          </div>
+          <p class="dashboard-meta" id="dashboard-meta">Загрузка…</p>
+        </header>
+
+        <div class="dashboard-tabs" id="dashboard-tabs" role="tablist" aria-label="Уровни"></div>
+        <div class="dashboard-panel" id="dashboard-panel"></div>
+      </section>
+    </main>
+
+    <script src="config.js?v=3"></script>
+    <script src="dashboard.js?v=3"></script>
+  </body>
+</html>
