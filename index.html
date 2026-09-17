@@ -6,9 +6,9 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
     />
-    <meta name="theme-color" content="#0B3D3A" />
+    <meta name="theme-color" content="#dceee9" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>PharmConsilium</title>
     <link rel="preload" as="image" href="pharmacy.png" />
     <link rel="preload" as="image" href="polyclinic.png" />
@@ -28,16 +28,30 @@
       <img src="logo.png" alt="" width="1" height="1" decoding="async" />
     </div>
     <div class="atmosphere" aria-hidden="true">
+      <span class="atm-wash atm-wash-a"></span>
+      <span class="atm-wash atm-wash-b"></span>
+      <span class="atm-wash atm-wash-c"></span>
       <span class="orb orb-a"></span>
       <span class="orb orb-b"></span>
       <span class="orb orb-c"></span>
+      <span class="atm-cross atm-cross-a"></span>
+      <span class="atm-cross atm-cross-b"></span>
+      <span class="atm-capsule atm-capsule-a"></span>
+      <span class="atm-capsule atm-capsule-b"></span>
+      <span class="atm-capsule atm-capsule-c"></span>
+      <span class="atm-bubble" style="--i: 0"></span>
+      <span class="atm-bubble" style="--i: 1"></span>
+      <span class="atm-bubble" style="--i: 2"></span>
+      <span class="atm-bubble" style="--i: 3"></span>
+      <span class="atm-bubble" style="--i: 4"></span>
+      <span class="atm-bubble" style="--i: 5"></span>
+      <span class="atm-grid"></span>
       <span class="grain"></span>
     </div>
 
     <main class="app">
       <section class="screen screen-welcome is-active" id="welcome" aria-label="Старт">
         <header class="brand-block">
-          <div class="brand-bloom" aria-hidden="true"></div>
           <div class="welcome-logo" aria-hidden="true">
             <span class="welcome-logo-stage">
               <span class="welcome-logo-mark"></span>
@@ -97,6 +111,36 @@
             <h2 class="levels-title">Выбор уровня</h2>
           </div>
         </header>
+
+        <div class="levels-map" aria-hidden="true">
+          <svg class="levels-map-routes" viewBox="0 0 320 220" preserveAspectRatio="xMidYMid meet">
+            <path class="levels-map-road" d="M160 110 C160 80 160 52 160 30" />
+            <path class="levels-map-road" d="M160 110 C198 92 230 78 258 58" />
+            <path class="levels-map-road" d="M160 110 C198 128 230 146 258 164" />
+            <path class="levels-map-road" d="M160 110 C122 128 90 146 62 164" />
+            <path class="levels-map-road" d="M160 110 C122 92 90 78 62 58" />
+          </svg>
+
+          <div class="levels-map-spot levels-map-pharmacy" style="--x: 50%; --y: 12%">
+            <img src="pharmacy.png" alt="" decoding="async" />
+          </div>
+          <div class="levels-map-spot levels-map-pharmacy" style="--x: 84%; --y: 30%">
+            <img src="pharmacy.png" alt="" decoding="async" />
+          </div>
+          <div class="levels-map-spot levels-map-pharmacy" style="--x: 84%; --y: 72%">
+            <img src="pharmacy.png" alt="" decoding="async" />
+          </div>
+          <div class="levels-map-spot levels-map-pharmacy" style="--x: 16%; --y: 72%">
+            <img src="pharmacy.png" alt="" decoding="async" />
+          </div>
+          <div class="levels-map-spot levels-map-pharmacy" style="--x: 16%; --y: 30%">
+            <img src="pharmacy.png" alt="" decoding="async" />
+          </div>
+
+          <div class="levels-map-spot levels-map-clinic" style="--x: 50%; --y: 50%">
+            <img src="polyclinic.png" alt="" decoding="async" />
+          </div>
+        </div>
 
         <div class="level-list" role="list">
           <button class="level" type="button" data-level="1" role="listitem">
