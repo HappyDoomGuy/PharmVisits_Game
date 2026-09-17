@@ -13,7 +13,7 @@
   --font-display: "Fraunces", Georgia, serif;
   --font-ui: "Sora", system-ui, sans-serif;
   --page-bg: #dce6f0;
-  color-scheme: light;
+  color-scheme: only light;
 }
 
 .asset-preload {
@@ -37,30 +37,46 @@
 
 html {
   margin: 0;
+  padding: 0;
+  background: var(--page-bg);
   background-color: var(--page-bg);
   height: 100%;
-  height: -webkit-fill-available;
 }
 
 body {
   margin: 0;
+  padding: 0;
   min-height: 100%;
+  min-height: 100svh;
   min-height: 100dvh;
-  min-height: -webkit-fill-available;
   display: flex;
   flex-direction: column;
   font-family: var(--font-ui);
   color: var(--ink);
+  background: var(--page-bg);
+  background-color: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  top: calc(-1 * env(safe-area-inset-top, 0px) - 50px);
+  right: calc(-1 * env(safe-area-inset-right, 0px) - 20px);
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px) - 50px);
+  left: calc(-1 * env(safe-area-inset-left, 0px) - 20px);
   background-color: var(--page-bg);
   background-image:
     radial-gradient(90% 55% at 8% 0%, rgba(159, 210, 235, 0.7) 0%, transparent 58%),
     radial-gradient(70% 45% at 100% 8%, rgba(184, 210, 228, 0.65) 0%, transparent 55%),
     radial-gradient(55% 40% at 70% 100%, rgba(226, 222, 210, 0.45) 0%, transparent 60%),
     radial-gradient(40% 30% at 20% 85%, rgba(126, 184, 224, 0.28) 0%, transparent 70%),
-    linear-gradient(165deg, #f3f7fb 0%, #e4eef5 38%, #d5ebe4 72%, #c8d6e6 100%);
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-  overscroll-behavior: none;
+    linear-gradient(165deg, #f3f7fb 0%, #e4eef5 38%, #d5e4f0 72%, #c8d6e6 100%);
 }
 
 button,
@@ -70,10 +86,10 @@ input {
 
 .atmosphere {
   position: fixed;
-  top: -40vh;
-  right: 0;
-  bottom: -40vh;
-  left: 0;
+  top: calc(-1 * env(safe-area-inset-top, 0px) - 40vh);
+  right: calc(-1 * env(safe-area-inset-right, 0px));
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px) - 40vh);
+  left: calc(-1 * env(safe-area-inset-left, 0px));
   pointer-events: none;
   overflow: hidden;
   z-index: 0;
@@ -397,9 +413,10 @@ input {
   z-index: 1;
   width: min(100%, 28rem);
   margin: 0 auto;
-  flex: 1 0 auto;
+  flex: 1 1 auto;
+  min-height: 100svh;
   min-height: 100dvh;
-  min-height: -webkit-fill-available;
+  box-sizing: border-box;
   padding:
     max(1.25rem, env(safe-area-inset-top))
     max(1.25rem, env(safe-area-inset-right))
@@ -422,7 +439,8 @@ input {
 }
 
 .screen-welcome.is-active {
-  justify-content: space-between;
+  justify-content: flex-start;
+  min-height: 100%;
 }
 
 .screen[hidden] {
@@ -443,7 +461,7 @@ input {
 
 .brand-block {
   position: relative;
-  margin-top: clamp(2.8rem, 14vh, 5.5rem);
+  margin-top: clamp(4rem, 18vh, 7rem);
   margin-bottom: 0;
   display: grid;
   justify-items: center;
@@ -483,8 +501,32 @@ input {
   display: inline-block;
   opacity: 0;
   transform: translateY(1.15rem) scale(0.82);
-  animation: brandLetterIn 0.78s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(1s + var(--i) * 0.055s);
+  color: transparent;
+  background-image:
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(190, 225, 255, 0.05) 45%,
+      rgba(255, 255, 255, 0.35) 48%,
+      rgba(255, 255, 255, 0.95) 50%,
+      rgba(200, 230, 255, 0.45) 52%,
+      rgba(190, 225, 255, 0.05) 55%,
+      transparent 60%,
+      transparent 100%
+    ),
+    linear-gradient(var(--teal-deep), var(--teal-deep));
+  background-size: 250% 100%, 100% 100%;
+  background-position: 140% 0, 0 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation:
+    brandLetterIn 0.78s cubic-bezier(0.16, 1, 0.3, 1) both,
+    brandTextShine 0.7s cubic-bezier(0.35, 0.05, 0.2, 1) both;
+  animation-delay:
+    calc(1s + var(--i) * 0.055s),
+    calc(2.95s + var(--i) * 0.07s);
 }
 
 .brand-consilium {
@@ -497,29 +539,31 @@ input {
 .brand-consilium .brand-letter {
   display: inline-block;
   color: transparent;
-  background: linear-gradient(105deg, #0b2f4a 0%, #2a6f9e 45%, #4e9cc8 78%, #164a6e 100%);
-  background-size: 220% 100%;
+  background-image:
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(190, 225, 255, 0.05) 45%,
+      rgba(255, 255, 255, 0.35) 48%,
+      rgba(255, 255, 255, 0.95) 50%,
+      rgba(200, 230, 255, 0.45) 52%,
+      rgba(190, 225, 255, 0.05) 55%,
+      transparent 60%,
+      transparent 100%
+    ),
+    linear-gradient(105deg, #0b2f4a 0%, #2a6f9e 45%, #4e9cc8 78%, #164a6e 100%);
+  background-size: 250% 100%, 220% 100%;
+  background-position: 140% 0, 0% 50%;
+  background-repeat: no-repeat;
   -webkit-background-clip: text;
   background-clip: text;
-  animation: brandGradientShift 4.5s ease-in-out 3.2s infinite;
-}
-
-.brand-sheen {
-  position: absolute;
-  inset: 8% -10% auto;
-  height: 84%;
-  border-radius: 999px;
-  background: linear-gradient(
-    105deg,
-    transparent 28%,
-    rgba(255, 255, 255, 0.55) 48%,
-    transparent 68%
-  );
-  mix-blend-mode: soft-light;
-  opacity: 0;
-  transform: translateX(-120%);
-  animation: brandSheen 1.15s cubic-bezier(0.22, 1, 0.36, 1) 2.95s both;
-  pointer-events: none;
+  animation:
+    brandTextShineAccent 0.7s cubic-bezier(0.35, 0.05, 0.2, 1) both,
+    brandGradientShift 4.5s ease-in-out 4.7s infinite;
+  animation-delay:
+    calc(3.3s + var(--i) * 0.07s),
+    4.7s;
 }
 
 @keyframes brandLetterIn {
@@ -561,27 +605,31 @@ input {
   }
 }
 
-@keyframes brandSheen {
+@keyframes brandTextShine {
   0% {
-    opacity: 0;
-    transform: translateX(-120%);
-  }
-  20% {
-    opacity: 0.85;
+    background-position: 160% 0, 0 0;
   }
   100% {
-    opacity: 0;
-    transform: translateX(120%);
+    background-position: -60% 0, 0 0;
+  }
+}
+
+@keyframes brandTextShineAccent {
+  0% {
+    background-position: 160% 0, 0% 50%;
+  }
+  100% {
+    background-position: -60% 0, 0% 50%;
   }
 }
 
 @keyframes brandGradientShift {
   0%,
   100% {
-    background-position: 0% 50%;
+    background-position: -60% 0, 0% 50%;
   }
   50% {
-    background-position: 100% 50%;
+    background-position: -60% 0, 100% 50%;
   }
 }
 
@@ -590,7 +638,6 @@ input {
   .brand-pharm .brand-letter,
   .brand-consilium,
   .brand-consilium .brand-letter,
-  .brand-sheen,
   .welcome-logo-stage,
   .welcome-logo-mark,
   .welcome-form .field,
@@ -605,6 +652,10 @@ input {
   .brand-pharm .brand-letter {
     opacity: 1;
     transform: none;
+    color: var(--teal-deep);
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
   }
 
   .brand-consilium {
@@ -617,10 +668,6 @@ input {
     background: none;
     -webkit-background-clip: unset;
     background-clip: unset;
-  }
-
-  .brand-sheen {
-    display: none;
   }
 
   .welcome-logo-stage {
@@ -716,7 +763,7 @@ input {
 .welcome-form {
   display: grid;
   gap: 1rem;
-  margin-top: 0;
+  margin-top: auto;
   margin-bottom: 0;
   padding-bottom: 0.5rem;
   width: 100%;
@@ -891,6 +938,53 @@ input {
   width: 100%;
   height: auto;
   object-fit: contain;
+  filter:
+    contrast(1.28)
+    saturate(1.35)
+    brightness(1.04)
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.55))
+    drop-shadow(0 2px 3px rgba(11, 47, 74, 0.28))
+    drop-shadow(0 10px 18px rgba(11, 47, 74, 0.32));
+}
+
+.levels-map-clinic img {
+  filter:
+    contrast(1.32)
+    saturate(1.4)
+    brightness(1.06)
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.6))
+    drop-shadow(0 3px 5px rgba(11, 47, 74, 0.3))
+    drop-shadow(0 14px 24px rgba(11, 47, 74, 0.36));
+}
+
+.levels-map-spot::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 78%;
+  height: 28%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(11, 47, 74, 0.2) 0%,
+    rgba(11, 47, 74, 0.08) 45%,
+    transparent 72%
+  );
+  z-index: -1;
+  pointer-events: none;
+}
+
+.levels-map-clinic::before {
+  width: 88%;
+  height: 34%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(11, 47, 74, 0.24) 0%,
+    rgba(11, 47, 74, 0.1) 48%,
+    transparent 74%
+  );
 }
 
 .levels-map-pharmacy:nth-child(2) {
