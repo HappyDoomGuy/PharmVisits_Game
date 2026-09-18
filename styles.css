@@ -830,11 +830,7 @@ html.is-telegram .app {
 body.welcome-settled .welcome-logo-stage,
 body.welcome-settled .welcome-form .field,
 body.welcome-settled .welcome-form .btn-primary,
-body.welcome-settled .welcome-form .welcome-results-btn,
-body.welcome-settled .brand-word,
-body.welcome-settled .brand-pharm .brand-letter,
-body.welcome-settled .brand-consilium,
-body.welcome-settled .brand-consilium .brand-letter {
+body.welcome-settled .welcome-form .welcome-results-btn {
   opacity: 1 !important;
   transform: none !important;
   animation: none !important;
@@ -842,13 +838,26 @@ body.welcome-settled .brand-consilium .brand-letter {
 
 body.welcome-settled .brand-word {
   transform: none !important;
+  animation: none !important;
 }
 
-body.welcome-settled .brand-pharm .brand-letter,
+body.welcome-settled .brand-consilium {
+  opacity: 1 !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+body.welcome-settled .brand-pharm .brand-letter {
+  opacity: 1 !important;
+  transform: none !important;
+  animation: none !important;
+  background-position: -60% 0, 0 0;
+}
+
 body.welcome-settled .brand-consilium .brand-letter {
-  color: var(--teal-deep);
-  background-image: none;
-  -webkit-text-fill-color: var(--teal-deep);
+  opacity: 1 !important;
+  transform: none !important;
+  animation: brandGradientShift 4.5s ease-in-out infinite !important;
 }
 
 @keyframes welcomeFormIn {
