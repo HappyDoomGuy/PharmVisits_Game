@@ -23,7 +23,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=8" />
+    <link rel="stylesheet" href="styles.css?v=15" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
@@ -41,9 +41,13 @@
       <span class="orb orb-c"></span>
       <span class="atm-cross atm-cross-a"></span>
       <span class="atm-cross atm-cross-b"></span>
+      <span class="atm-cross atm-cross-c"></span>
+      <span class="atm-cross atm-cross-d"></span>
       <span class="atm-capsule atm-capsule-a"></span>
       <span class="atm-capsule atm-capsule-b"></span>
       <span class="atm-capsule atm-capsule-c"></span>
+      <span class="atm-capsule atm-capsule-d"></span>
+      <span class="atm-capsule atm-capsule-e"></span>
       <span class="atm-bubble" style="--i: 0"></span>
       <span class="atm-bubble" style="--i: 1"></span>
       <span class="atm-bubble" style="--i: 2"></span>
@@ -103,7 +107,12 @@
               autocapitalize="words"
             />
           </label>
-          <button class="btn btn-primary" type="submit">Старт</button>
+          <button class="ignition-start" type="submit" id="ignition-start" aria-label="Старт">
+            <span class="ignition-start-inner">
+              <canvas class="ignition-start-canvas" id="ignition-start-canvas" aria-hidden="true"></canvas>
+              <span class="ignition-start-label">Старт</span>
+            </span>
+          </button>
           <button class="btn btn-secondary welcome-results-btn" type="button" id="welcome-results-btn">
             Посмотреть результаты
           </button>
@@ -275,7 +284,8 @@
       </section>
     </main>
 
-    <script src="config.js?v=7"></script>
-    <script src="app.js?v=7"></script>
+    <script src="config.js?v=9"></script>
+    <script src="ignition-start.js?v=7"></script>
+    <script src="app.js?v=11"></script>
   </body>
 </html>

@@ -771,7 +771,7 @@ function startLevel(level) {
   openBriefing(level);
 }
 
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const value = formatName(nameInput.value);
   if (!value) {
@@ -779,8 +779,33 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
+  const startBtn = document.getElementById("ignition-start");
+  if (startBtn?.disabled) return;
+
   playerName = value;
   greeting.textContent = `Здравствуйте, ${playerName}`;
+  sessionStorage.setItem("pharmconsilium-name", playerName);
+
+  if (startBtn) {
+    startBtn.disabled = true;
+    startBtn.setAttribute("aria-busy", "true");
+  }
+  nameInput.disabled = true;
+
+  try {
+    if (typeof window.pharmIgnitionBurst === "function") {
+      await window.pharmIgnitionBurst(600);
+    } else {
+      await new Promise((resolve) => window.setTimeout(resolve, 600));
+    }
+  } finally {
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.removeAttribute("aria-busy");
+    }
+    nameInput.disabled = false;
+  }
+
   showScreen("levels");
 });
 
