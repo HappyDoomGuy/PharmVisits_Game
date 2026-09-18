@@ -1,10 +1,87 @@
 const LEVELS = {
-  1: { name: "Уровень I", maxPicks: 4, next: "1-1", field: "pharmacies" },
-  "1-1": { name: "Уровень I-I", maxPicks: 3, field: "pharmacies" },
-  2: { name: "Уровень II", maxPicks: 4, next: "2-1", field: "pharmacies", traps: true },
-  "2-1": { name: "Уровень II-I", maxPicks: 3, field: "pharmacies", traps: true },
-  3: { name: "Уровень III", maxPicks: 4, next: "3-1", field: "pharmacies", traps: "single2" },
-  "3-1": { name: "Уровень III-I", maxPicks: 3, field: "pharmacies", traps: "single2" },
+  1: {
+    name: "Уровень I",
+    maxPicks: 4,
+    next: "1-1",
+    field: "pharmacies",
+    rules: {
+      lead: "У вас есть 4 визита в аптеки.",
+      steps: [
+        "Над каждой аптекой указано количество денег, которое приносит этот визит.",
+        "Соберите визитами максимальное количество денег.",
+      ],
+    },
+  },
+  "1-1": {
+    name: "Уровень I-I",
+    maxPicks: 3,
+    field: "pharmacies",
+    rules: {
+      lead: "У вас есть 3 визита в аптеки.",
+      steps: [
+        "Над каждой аптекой указано количество денег, которое приносит этот визит.",
+        "Соберите визитами максимальное количество денег.",
+      ],
+    },
+  },
+  2: {
+    name: "Уровень II",
+    maxPicks: 4,
+    next: "2-1",
+    field: "pharmacies",
+    traps: true,
+    rules: {
+      lead: "У вас есть 4 визита в аптеки.",
+      steps: [
+        "Над каждой аптекой указано количество денег, которое приносит этот визит.",
+        "Красный цвет шаров обозначает, что на сетевом складе нет товара.",
+        "Соберите визитами максимальное количество денег.",
+      ],
+    },
+  },
+  "2-1": {
+    name: "Уровень II-I",
+    maxPicks: 3,
+    field: "pharmacies",
+    traps: true,
+    rules: {
+      lead: "У вас есть 3 визита в аптеки.",
+      steps: [
+        "Над каждой аптекой указано количество денег, которое приносит этот визит.",
+        "Красный цвет шаров обозначает, что на сетевом складе нет товара.",
+        "Соберите визитами максимальное количество денег.",
+      ],
+    },
+  },
+  3: {
+    name: "Уровень III",
+    maxPicks: 4,
+    next: "3-1",
+    field: "pharmacies",
+    traps: "single2",
+    rules: {
+      lead: "У вас есть 4 визита в аптеки.",
+      steps: [
+        "Над каждой аптекой указано количество денег, которое приносит этот визит.",
+        "Красный круг над аптекой обозначает, что данная аптека низкой лояльности.",
+        "Соберите визитами максимальное количество денег.",
+      ],
+    },
+  },
+  "3-1": {
+    name: "Уровень III-I",
+    maxPicks: 3,
+    field: "pharmacies",
+    traps: "single2",
+    rules: {
+      lead: "У вас есть 3 визита в аптеки.",
+      steps: [
+        "Над каждой аптекой указано количество денег, которое приносит этот визит.",
+        "Красный круг над аптекой обозначает, что данная аптека низкой лояльности.",
+        "Соберите визитами максимальное количество денег.",
+      ],
+    },
+  },
 };
 
 const ASSET_URLS = ["pharmacy.png", "polyclinic.png", "logo.png"];
@@ -630,13 +707,33 @@ function buildPlaceholderField() {
   playSky.replaceChildren(note);
 }
 
-function pharmaciesWord(count) {
-  const n = Math.abs(count) % 100;
-  const n1 = n % 10;
-  if (n > 10 && n < 20) return "аптек";
-  if (n1 === 1) return "аптеку";
-  if (n1 >= 2 && n1 <= 4) return "аптеки";
-  return "аптек";
+function escapeBriefingHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function renderBriefingRules(rules) {
+  if (!rules) {
+    return `<p class="briefing-lead">Внимательно выполните задание уровня, чтобы набрать максимальный результат.</p>`;
+  }
+
+  if (typeof rules === "string") {
+    return `<p class="briefing-lead">${escapeBriefingHtml(rules)}</p>`;
+  }
+
+  const lead = rules.lead
+    ? `<p class="briefing-lead">${escapeBriefingHtml(rules.lead)}</p>`
+    : "";
+  const steps = Array.isArray(rules.steps) && rules.steps.length
+    ? `<ul class="briefing-steps">${rules.steps
+        .map((step) => `<li>${escapeBriefingHtml(step)}</li>`)
+        .join("")}</ul>`
+    : "";
+
+  return `${lead}${steps}`;
 }
 
 function openBriefing(level) {
@@ -646,13 +743,7 @@ function openBriefing(level) {
   currentLevel = level;
   stopTimer();
   briefingLevel.textContent = meta.name;
-
-  if (meta.maxPicks) {
-    briefingText.textContent = `Выберите ${meta.maxPicks} ${pharmaciesWord(meta.maxPicks)}, чтобы набрать максимальный результат.`;
-  } else {
-    briefingText.textContent =
-      "Внимательно выполните задание уровня, чтобы набрать максимальный результат.";
-  }
+  briefingText.innerHTML = renderBriefingRules(meta.rules);
 
   showScreen("briefing");
 }
