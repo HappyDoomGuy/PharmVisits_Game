@@ -829,6 +829,26 @@ nameInput.addEventListener("change", () => {
   if (value) sessionStorage.setItem("pharmconsilium-name", value);
 });
 
+const welcomeLogoBtn = document.getElementById("welcome-logo-btn");
+const welcomeLogoMark = document.getElementById("welcome-logo-mark");
+
+function spinWelcomeLogo() {
+  if (!welcomeLogoMark) return;
+  welcomeLogoMark.classList.remove("is-spinning");
+  void welcomeLogoMark.offsetWidth;
+  welcomeLogoMark.classList.add("is-spinning");
+}
+
+welcomeLogoBtn?.addEventListener("click", () => {
+  spinWelcomeLogo();
+});
+
+welcomeLogoMark?.addEventListener("animationend", (event) => {
+  if (event.animationName !== "logoImpactSpin") return;
+  if (!welcomeLogoMark.classList.contains("is-spinning")) return;
+  welcomeLogoMark.classList.remove("is-spinning");
+});
+
 /* —— Dashboard (results by level) —— */
 const DASH_LEVEL_LABELS = {
   1: "I",

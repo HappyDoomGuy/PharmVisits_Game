@@ -722,7 +722,22 @@ html.is-telegram .app {
 .welcome-logo {
   display: grid;
   place-items: center;
-  pointer-events: none;
+}
+
+.welcome-logo-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0.35rem;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 1.25rem;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.welcome-logo-btn:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 4px;
 }
 
 .welcome-logo-stage {
@@ -733,6 +748,7 @@ html.is-telegram .app {
   opacity: 0;
   transform: scale(0.72) translateY(12px);
   animation: welcomeLogoIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+  pointer-events: none;
 }
 
 .welcome-logo-mark {
@@ -757,6 +773,12 @@ html.is-telegram .app {
     logoImpactSpin 2.15s cubic-bezier(0.08, 0.72, 0.12, 1) 2.05s both,
     logoIdleSpin 10s linear 4.2s infinite,
     brandGradientShift 4.5s ease-in-out 3.2s infinite;
+}
+
+.welcome-logo-mark.is-spinning {
+  animation:
+    logoImpactSpin 2.15s cubic-bezier(0.08, 0.72, 0.12, 1) both,
+    brandGradientShift 4.5s ease-in-out infinite !important;
 }
 
 @keyframes welcomeLogoIn {
@@ -834,6 +856,12 @@ body.welcome-settled .welcome-form .welcome-results-btn {
   opacity: 1 !important;
   transform: none !important;
   animation: none !important;
+}
+
+body.welcome-settled .welcome-logo-mark:not(.is-spinning) {
+  animation:
+    logoIdleSpin 10s linear infinite,
+    brandGradientShift 4.5s ease-in-out infinite;
 }
 
 body.welcome-settled .brand-word {
