@@ -2449,6 +2449,97 @@ body.welcome-settled .brand-consilium .brand-letter {
   line-height: 1.45;
 }
 
+.dashboard-clear-btn {
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+  width: 100%;
+}
+
+.btn-danger {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+  padding: 0.95rem 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: linear-gradient(160deg, #d97868 0%, #a94438 100%);
+  color: #fff8f6;
+  box-shadow: 0 14px 28px rgba(169, 68, 56, 0.22);
+  transition: transform 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(160deg, #e18878 0%, #b24d40 100%);
+}
+
+.btn-danger:active {
+  transform: scale(0.98);
+}
+
+.btn-danger:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.confirm-alert {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(11, 47, 74, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.confirm-alert[hidden] {
+  display: none !important;
+}
+
+.confirm-alert-card {
+  width: min(100%, 22rem);
+  display: grid;
+  gap: 0.55rem;
+  padding: 1.35rem 1.2rem 1.2rem;
+  border-radius: calc(var(--radius) + 0.15rem);
+  background: linear-gradient(180deg, #fff5f3 0%, #ffe8e4 100%);
+  border: 1.5px solid rgba(201, 107, 90, 0.35);
+  box-shadow: 0 22px 48px rgba(120, 40, 28, 0.28);
+  text-align: center;
+}
+
+.confirm-alert-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--danger-soft);
+}
+
+.confirm-alert-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 5.5vw, 1.7rem);
+  font-weight: 650;
+  color: #8f2f24;
+  letter-spacing: -0.02em;
+}
+
+.confirm-alert-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #6d3a33;
+}
+
+.confirm-alert-actions {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+}
+
 @media (max-width: 380px) {
   .dashboard-row {
     gap: 0.6rem;

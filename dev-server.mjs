@@ -116,6 +116,45 @@ async function tursoPipeline(requests) {
   return response.json();
 }
 
+async function handleClearStats(req, res) {
+  if (req.method === "OPTIONS") return sendJson(res, 204, {});
+  if (req.method !== "POST") {
+    return sendJson(res, 405, { error: "Method not allowed" });
+  }
+
+  let body = {};
+  try {
+    body = await readBody(req);
+  } catch {
+    return sendJson(res, 400, { error: "Invalid JSON" });
+  }
+
+  const adminIds = new Set([714228956, 6747512147]);
+  const telegramId = Number(body?.telegramId);
+  if (!Number.isFinite(telegramId) || !adminIds.has(telegramId)) {
+    return sendJson(res, 403, { error: "Forbidden" });
+  }
+
+  try {
+    await tursoPipeline([
+      {
+        type: "execute",
+        stmt: {
+          sql: "DELETE FROM level_scores",
+          args: [],
+        },
+      },
+      { type: "close" },
+    ]);
+    return sendJson(res, 200, { ok: true });
+  } catch (error) {
+    return sendJson(res, 502, {
+      error: "Failed to clear stats",
+      details: String(error.message || error),
+    });
+  }
+}
+
 async function handleStats(req, res) {
   if (req.method === "OPTIONS") return sendJson(res, 204, {});
   if (req.method !== "GET" && req.method !== "POST") {
@@ -248,6 +287,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (urlPath === "/api/stats") return await handleStats(req, res);
+    if (urlPath === "/api/clear-stats") return await handleClearStats(req, res);
     if (urlPath === "/api/score") return await handleScore(req, res);
     return serveStatic(req, res);
   } catch (error) {

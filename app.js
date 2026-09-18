@@ -886,11 +886,17 @@ const DASH_LEVEL_LABELS = {
 const DASH_LEVEL_ORDER = ["1", "1-1", "2", "2-1", "3", "3-1"];
 
 const welcomeResultsBtn = document.getElementById("welcome-results-btn");
+const DASH_ADMIN_TELEGRAM_IDS = new Set([714228956, 6747512147]);
+
 const dashboardBackBtn = document.getElementById("dashboard-back-btn");
 const dashboardTabsEl = document.getElementById("dashboard-tabs");
 const dashboardPanelEl = document.getElementById("dashboard-panel");
 const dashboardMetaEl = document.getElementById("dashboard-meta");
 const dashboardRefreshBtn = document.getElementById("dashboard-refresh-btn");
+const dashboardClearBtn = document.getElementById("dashboard-clear-btn");
+const clearStatsAlert = document.getElementById("clear-stats-alert");
+const clearStatsConfirmBtn = document.getElementById("clear-stats-confirm-btn");
+const clearStatsCancelBtn = document.getElementById("clear-stats-cancel-btn");
 
 let dashActiveLevel = "1";
 let dashStatsCache = null;
@@ -1041,8 +1047,19 @@ async function loadDashboard() {
   }
 }
 
+function canClearDashboardStats() {
+  const telegramId = getTelegramUserId();
+  return telegramId != null && DASH_ADMIN_TELEGRAM_IDS.has(telegramId);
+}
+
+function syncDashboardAdminControls() {
+  dashboardClearBtn.hidden = !canClearDashboardStats();
+  if (dashboardClearBtn.hidden) closeClearStatsAlert();
+}
+
 function openDashboard() {
   document.body.classList.add("welcome-settled");
+  syncDashboardAdminControls();
   showScreen("dashboard");
   void loadDashboard();
 }
@@ -1066,6 +1083,69 @@ dashboardTabsEl.addEventListener("click", (event) => {
 
 dashboardRefreshBtn.addEventListener("click", () => {
   void loadDashboard();
+});
+
+function openClearStatsAlert() {
+  clearStatsAlert.hidden = false;
+  clearStatsConfirmBtn.focus();
+}
+
+function closeClearStatsAlert() {
+  clearStatsAlert.hidden = true;
+}
+
+async function clearAllStats() {
+  if (!canClearDashboardStats()) {
+    dashboardMetaEl.textContent = "Недостаточно прав";
+    closeClearStatsAlert();
+    return;
+  }
+
+  const apiUrl = window.PHARM_CONFIG?.clearStatsApiUrl || "/api/clear-stats";
+  clearStatsConfirmBtn.disabled = true;
+  clearStatsConfirmBtn.textContent = "Удаление…";
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telegramId: getTelegramUserId() }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || `Ошибка ${response.status}`);
+    }
+    closeClearStatsAlert();
+    await loadDashboard();
+  } catch (error) {
+    dashboardMetaEl.textContent = error.message || "Не удалось очистить";
+  } finally {
+    clearStatsConfirmBtn.disabled = false;
+    clearStatsConfirmBtn.textContent = "Подтвердить";
+  }
+}
+
+dashboardClearBtn.addEventListener("click", () => {
+  if (!canClearDashboardStats()) return;
+  openClearStatsAlert();
+});
+
+clearStatsCancelBtn.addEventListener("click", () => {
+  closeClearStatsAlert();
+});
+
+clearStatsConfirmBtn.addEventListener("click", () => {
+  void clearAllStats();
+});
+
+clearStatsAlert.addEventListener("click", (event) => {
+  if (event.target === clearStatsAlert) closeClearStatsAlert();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !clearStatsAlert.hidden) {
+    closeClearStatsAlert();
+  }
 });
 
 if (location.hash === "#dashboard") {

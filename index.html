@@ -23,7 +23,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=15" />
+    <link rel="stylesheet" href="styles.css?v=16" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
@@ -136,7 +136,24 @@
 
         <div class="dashboard-tabs" id="dashboard-tabs" role="tablist" aria-label="Уровни"></div>
         <div class="dashboard-panel" id="dashboard-panel"></div>
+          <button class="btn btn-danger dashboard-clear-btn" type="button" id="dashboard-clear-btn" hidden>
+            Очистить
+          </button>
       </section>
+
+      <div class="confirm-alert" id="clear-stats-alert" hidden>
+        <div class="confirm-alert-card" role="alertdialog" aria-modal="true" aria-labelledby="clear-stats-title" aria-describedby="clear-stats-text">
+          <p class="confirm-alert-kicker">Внимание</p>
+          <h2 class="confirm-alert-title" id="clear-stats-title">Очистить результаты?</h2>
+          <p class="confirm-alert-text" id="clear-stats-text">
+            Все записи игроков будут удалены без возможности восстановления.
+          </p>
+          <div class="confirm-alert-actions">
+            <button class="btn btn-danger" type="button" id="clear-stats-confirm-btn">Подтвердить</button>
+            <button class="btn btn-secondary" type="button" id="clear-stats-cancel-btn">Отмена</button>
+          </div>
+        </div>
+      </div>
 
       <section class="screen screen-levels" id="levels" aria-label="Уровни" hidden>
         <header class="levels-header">
@@ -286,6 +303,6 @@
 
     <script src="config.js?v=9"></script>
     <script src="ignition-start.js?v=7"></script>
-    <script src="app.js?v=11"></script>
+    <script src="app.js?v=13"></script>
   </body>
 </html>
