@@ -1468,6 +1468,8 @@ h1 {
   }
 }
 .comic-note {
+  display: grid;
+  gap: 4px;
   margin: 0 0 12px;
   padding: 10px 12px;
   border: 2px solid #1e2430;
@@ -1479,6 +1481,12 @@ h1 {
 }
 .comic-note.is-hit { background: #f3ffe8; }
 .comic-note.is-miss { background: #fff1ec; }
+.comic-result {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+.comic-note.is-hit .comic-result { color: #176b32; }
+.comic-note.is-miss .comic-result { color: #9a3412; }
 .chosen-line { margin: 0 0 4px; font-weight: 700; }
 .sheet .block-title { margin-top: 12px; }
 

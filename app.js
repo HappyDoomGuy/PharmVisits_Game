@@ -1771,7 +1771,8 @@
     const rapport = state.rapport && state.rapport.doctorId === doctor.id ? state.rapport : null;
     if (rapport && rapport.pick && rapport.closed) {
       const reaction = voicedReaction(doctor, rapport);
-      return `<p class="comic-note${rapport.hit ? " is-hit" : " is-miss"}">${esc(reaction)}</p>`;
+      const outcome = rapport.hit ? "Баллы удваиваются." : "Только половина баллов.";
+      return `<p class="comic-note${rapport.hit ? " is-hit" : " is-miss"}"><span class="comic-line">${esc(reaction)}</span><b class="comic-result">${outcome}</b></p>`;
     }
     return `<button type="button" class="btn interest" data-action="open-rapport">Наладить контакт</button>`;
   }
