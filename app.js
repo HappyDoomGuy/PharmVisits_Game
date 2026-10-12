@@ -25,7 +25,7 @@
   let cityScroll = null;
 
   // Clinics stand on the road. A banner above each roof shows the trip and the points.
-  const CLINIC_W = 194;
+  const CLINIC_W = 225;
   const CLINIC_H = 263;
   const BANNER_H = 42;
   const BANNER_GAP = 10;
@@ -372,7 +372,7 @@
         <rect x="10" y="26" width="48" height="30" fill="#f4efe4"/>
         <rect x="26" y="40" width="16" height="16" rx="1" fill="#6b4a34"/>
       </g>
-      ${clinicSvg(0, "#0f766e").replace("<svg ", '<svg x="946" y="420" width="116" height="158" ')}
+      ${clinicSvg(0, "#0f766e").replace("<svg ", '<svg x="937" y="420" width="135" height="158" ')}
     </svg>`;
   }
 
@@ -806,6 +806,23 @@
       { wall: "#f4f7f8", shade: "#dbe3e8", wing: "#e7eef2", glass: "#d0e4f1" },
     ];
     const face = faces[seed % faces.length];
+    const DX = -11;
+    const DY = -8;
+    const mix = (hex, toward, t) => {
+      const parse = (value) => {
+        const n = parseInt(value.slice(1), 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      };
+      const [r, g, b] = parse(hex);
+      const [tr, tg, tb] = parse(toward);
+      const channel = (c, tc) => Math.round(c + (tc - c) * t).toString(16).padStart(2, "0");
+      return `#${channel(r, tr)}${channel(g, tg)}${channel(b, tb)}`;
+    };
+    const depth = (x, y, w, h, color) => {
+      const side = mix(color, "#5c584f", 0.42);
+      const roof = mix(color, "#ffffff", 0.62);
+      return `<polygon points="${x},${y} ${x + DX},${y + DY} ${x + w + DX},${y + DY} ${x + w},${y}" fill="${roof}"/><polygon points="${x},${y} ${x + DX},${y + DY} ${x + DX},${y + h + DY} ${x},${y + h}" fill="${side}"/>`;
+    };
     const pane = (x, y, w, h, lit) => `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="0.5" fill="${lit ? "#f6e3b2" : "#f7fbfd"}" stroke="#b7c9d6" stroke-width="0.65"/><path d="M${x + w / 2} ${y} v${h} M${x} ${y + h * 0.42} h${w}" stroke="#d4e2ec" stroke-width="0.4"/><rect x="${x - 0.3}" y="${y + h}" width="${w + 0.6}" height="1.4" fill="#cfc7bb"/></g>`;
     const windows = [];
     for (let row = 0; row < 3; row += 1) {
@@ -818,7 +835,17 @@
     windows.push(pane(86, 136, 10, 12, seed % 3 === 0));
     const floors = [];
     for (let i = 0; i < 6; i += 1) floors.push(`<rect x="100" y="${42 + i * 16}" width="20" height="1.1" fill="#ffffff" opacity="0.72"/>`);
-    return `<svg viewBox="0 0 124 168" preserveAspectRatio="xMidYMax meet">
+    const volume = [
+      depth(100, 24, 20, 112, face.glass),
+      depth(22, 36, 82, 124, face.wall),
+      depth(18, 29, 88, 9, accent),
+      depth(46, 12, 34, 18, "#e7eef3"),
+      depth(4, 96, 24, 36, face.wing),
+      depth(2, 92, 28, 5, accent),
+      depth(40, 124, 46, 5.5, accent),
+    ].join("");
+    return `<svg viewBox="-10 0 144 168" preserveAspectRatio="xMidYMax meet">
+      ${volume}
       <rect x="4" y="96" width="24" height="36" fill="${face.wing}"/>
       <rect x="2" y="92" width="28" height="5" fill="${accent}"/>
       <rect x="22" y="36" width="82" height="124" fill="${face.wall}"/>
@@ -854,9 +881,11 @@
         <span class="clinic-banner">
           <span class="banner-time" data-meta="travel" hidden>
             <svg class="banner-time-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 8.2v4.8l2.8 1.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span class="banner-time-val"></span>
+            <span class="banner-time-copy">
+              <span class="banner-time-val"></span>
+              <span class="banner-kicker" data-meta="travel-kicker">в пути</span>
+            </span>
           </span>
-          <span class="banner-split" aria-hidden="true"></span>
           <span class="banner-pts banner-pts-open">
             <strong class="num" data-meta="pts">${clinic.points}</strong>
             <span class="banner-unit" data-meta="unit">баллов</span>
@@ -922,20 +951,20 @@
       const travelEl = stop.querySelector("[data-meta='travel']");
       const ptsEl = stop.querySelector("[data-meta='pts']");
       const unitOpen = stop.querySelector("[data-meta='unit']");
+      const hereNow = here === clinic.anchor || travel === 0;
       if (unitOpen) unitOpen.textContent = G.plural(clinic.points, "балл", "балла", "баллов");
       if (done) {
         travelEl.hidden = true;
-      } else if (here === clinic.anchor || travel === 0) {
-        travelEl.hidden = true;
-        ptsEl.textContent = G.formatScore(clinic.points);
       } else {
         travelEl.hidden = false;
         const travelText = travelEl.querySelector(".banner-time-val");
-        if (travelText) travelText.textContent = formatTravel(travel);
+        const travelKicker = travelEl.querySelector("[data-meta='travel-kicker']");
+        if (travelText) travelText.textContent = hereNow ? "здесь" : formatTravel(travel);
+        if (travelKicker) travelKicker.textContent = hereNow ? "на месте" : "в пути";
         ptsEl.textContent = G.formatScore(clinic.points);
       }
       const names = left.map((doctor) => doctor.name).join(", ");
-      const timeBit = travelEl.hidden ? "" : `, дорога ${formatTravel(travel)}`;
+      const timeBit = travelEl.hidden ? "" : hereNow ? ", вы уже здесь" : `, дорога ${formatTravel(travel)}`;
       if (button) {
         if (done) {
           button.setAttribute("aria-label", `${clinic.title}. Закрыта, ${G.formatScore(earned)} баллов.`);
@@ -1684,7 +1713,7 @@
       <h2>В путь</h2>
       <ul class="outcomes trip-facts">
         <li><span>В пути</span><b class="num">${esc(G.formatDuration(travel))}</b></li>
-        <li><span>Баллы за визит</span><b class="num">до ${esc(G.formatScore(clinic.points))}</b></li>
+        <li><span>Балл за успешный визит</span><b class="num">${esc(G.formatScore(clinic.points))}</b></li>
       </ul>
       <div class="stack">
         <button type="button" class="btn" data-action="depart">Поехать · ${esc(G.formatDuration(travel))}</button>
@@ -1895,7 +1924,7 @@
   function finishHtml() {
     return `<p class="eyebrow">До конца дня</p>
       <h2>Завершить день?</h2>
-      <p class="clock-note">Сейчас ${esc(G.formatScore(state.score))} баллов, визитов ${state.visited.length} из ${totalDoctorSlots()}. Осталось ${esc(G.formatDuration(state.minutesLeft))}.</p>
+      <p class="clock-note">Сейчас ${esc(G.formatScore(state.score))} баллов. Осталось ${esc(G.formatDuration(state.minutesLeft))}.</p>
       <div class="stack">
         <button type="button" class="btn" data-action="finish-day">К итогам</button>
         <button type="button" class="btn secondary" data-action="cancel">Ещё визиты</button>
