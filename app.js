@@ -1702,15 +1702,25 @@
         <span class="spec">${seen ? "Уже были" : esc(spec.label)}</span>
       </button>`;
     }).join("");
+    const full = esc(G.formatScore(clinic.points));
+    const half = esc(G.formatScore(clinic.points / 2));
     return `<p class="eyebrow">${esc(clinic.title)}</p>
       <h2>Кого посетить</h2>
       <p class="clock-note">На визит — 30 минут.</p>
-      <ul class="outcomes">
-        <li><span>Препарат по специальности</span><b>${esc(G.formatScore(clinic.points))}</b></li>
-        <li><span>Другая специальность</span><b>${esc(G.formatScore(clinic.points / 2))}</b></li>
-        <li><span>Нелюбимый препарат</span><b>0</b></li>
-      </ul>
-      <p class="sub">Занимательная беседа по интересам удваивает баллы, если врачу не интересно — лишь половина баллов.</p>
+      <div class="payoff">
+        <ul class="payoff-rows">
+          <li class="is-full"><b class="num">${full}</b><span>Препарат по специальности</span></li>
+          <li class="is-half"><b class="num">${half}</b><span>Другая специальность</span></li>
+          <li class="is-zero"><b class="num">0</b><span>Нелюбимый препарат</span></li>
+        </ul>
+        <div class="payoff-talk">
+          <p class="payoff-kicker">Занимательная беседа по интересам</p>
+          <div class="payoff-pair">
+            <p class="is-up"><b>×2</b><span>если попали в интересы</span></p>
+            <p class="is-down"><b>½</b><span>если врачу не интересно</span></p>
+          </div>
+        </div>
+      </div>
       <div class="doctor-pick">${cards}</div>
       <button type="button" class="btn secondary" data-action="cancel">Уехать дальше</button>`;
   }
@@ -2339,9 +2349,6 @@
   function summaryHtml() {
     const grade = G.grade(state.score);
     const save = loadSave();
-    const missed = dayClinics()
-      .map((clinic) => ({ ...clinic, left: doctorsLeft(clinic) }))
-      .filter((clinic) => clinic.left.length);
     const tips = coaching();
     const rows = [
       ["Визиты", `${state.visited.length} / ${totalDoctorSlots()}`],
@@ -2363,9 +2370,6 @@
     const journal = state.log.length
       ? `<div class="log summary-log">${state.log.map(logCard).join("")}</div>`
       : `<p class="summary-empty">Визитов не было.</p>`;
-    const missedLine = missed.length
-      ? `<p class="summary-miss"><b>Не посетили.</b> ${missed.map((clinic) => clinic.left.map((doctor) => esc(doctor.name)).join(", ")).join("; ")}.</p>`
-      : "";
     return `<section class="start menu summary-menu">
       ${menuSceneHtml()}
       <button type="button" class="menu-roster-btn" data-action="show-roster" aria-label="Справочник" title="Справочник">
@@ -2390,7 +2394,6 @@
             ${tipBlock}
             <p class="summary-kicker">Журнал</p>
             ${journal}
-            ${missedLine}
           </div>
           <button type="button" class="btn" data-action="new-day">Новый день</button>
         </div>
