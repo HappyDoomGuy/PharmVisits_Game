@@ -17,6 +17,7 @@
   let skyTrip = null;
   let skyMinutesOverride = null;
   let contactReplyTimer = 0;
+  let interestRevealTimer = 0;
   let roadLiftPx = 0;
   let hillShiftVb = 0;
   let roadSamples = [];
@@ -1733,9 +1734,12 @@
     const timeNote = canEnter
       ? `На визит — 30 минут. Останется ${G.formatDuration(left)}.`
       : `На визит — 30 минут. Сейчас осталось ${G.formatDuration(state.minutesLeft)}.`;
+    const scoutTime = esc(G.formatDuration(G.INTEREST_MINUTES));
+    const visitTime = esc(G.formatDuration(total));
     const learn = known
       ? ""
-      : `<button type="button" class="btn scout" data-action="learn-interests"${canScout ? "" : " disabled"}>Узнать интересы (−15 минут)</button>`;
+      : `<button type="button" class="btn scout btn-split" data-action="learn-interests"${canScout ? "" : " disabled"}><span class="btn-title">Узнать интересы</span><span class="btn-time">${scoutTime}</span></button>`;
+    const enter = `<button type="button" class="btn btn-split" data-action="depart"${canEnter ? "" : " disabled"}><span class="btn-title">Зайти</span><span class="btn-time">${visitTime}</span></button>`;
     return `<p class="eyebrow">${esc(clinic.title)}</p>
       <p class="clock-note">${esc(timeNote)}</p>
       <div class="doctor-card">
@@ -1748,9 +1752,7 @@
       ${dislike ? `<p class="gold-banner">Не назначает <b>${esc(dislike.name)}</b>.</p>` : `<p class="gold-chip">Назначает любой препарат из портфеля.</p>`}
       ${scout}
       <div class="stack">
-        ${learn
-          ? `<div class="action-row">${learn}<button type="button" class="btn" data-action="depart"${canEnter ? "" : " disabled"}>Зайти · ${esc(G.formatDuration(total))}</button></div>`
-          : `<button type="button" class="btn" data-action="depart"${canEnter ? "" : " disabled"}>Зайти · ${esc(G.formatDuration(total))}</button>`}
+        ${learn ? `<div class="action-row">${learn}${enter}</div>` : enter}
         <button type="button" class="btn secondary" data-action="back-doctors">К выбору врача</button>
       </div>`;
   }
@@ -2013,7 +2015,69 @@
     persist();
     updateHud();
     updateStops();
-    renderOverlay();
+    const sheet = document.querySelector(".overlay > .sheet");
+    if (!sheet || motionMs(1) === 0) {
+      renderOverlay();
+      return;
+    }
+    revealInterests(sheet, doctorId);
+  }
+
+  function revealInterests(sheet, doctorId) {
+    const row = sheet.querySelector(".action-row");
+    const scout = row && row.querySelector(".btn.scout");
+    const enter = row && row.querySelector("[data-action='depart']");
+    const stack = sheet.querySelector(".stack");
+    if (!row || !scout || !enter || !stack) {
+      renderOverlay();
+      return;
+    }
+    const note = sheet.querySelector(".clock-note");
+    if (note) {
+      const total = G.VISIT_MINUTES;
+      const left = Math.max(0, state.minutesLeft - total);
+      note.textContent = state.minutesLeft >= total
+        ? `На визит — 30 минут. Останется ${G.formatDuration(left)}.`
+        : `На визит — 30 минут. Сейчас осталось ${G.formatDuration(state.minutesLeft)}.`;
+    }
+    if (state.minutesLeft < G.VISIT_MINUTES) enter.disabled = true;
+
+    const list = document.createElement("ul");
+    list.className = "interests-row is-pop";
+    list.innerHTML = interestsOf(doctorId).map((id) => `<li>${esc(G.hobbyById(id).label)}</li>`).join("");
+    list.style.overflow = "hidden";
+    list.style.maxHeight = "0px";
+    list.style.marginTop = "0px";
+    list.style.marginBottom = "0px";
+    stack.before(list);
+    const fullHeight = list.scrollHeight;
+
+    const scoutWidth = scout.getBoundingClientRect().width;
+    const clip = document.createElement("div");
+    clip.className = "scout-clip";
+    row.insertBefore(clip, scout);
+    clip.appendChild(scout);
+    scout.disabled = true;
+    scout.style.flex = "0 0 auto";
+    scout.style.width = `${scoutWidth}px`;
+
+    sheet.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      list.style.transition = "max-height .4s cubic-bezier(.16, 1, .3, 1), margin-top .4s ease, margin-bottom .4s ease";
+      list.style.maxHeight = `${fullHeight}px`;
+      list.style.marginTop = "-4px";
+      list.style.marginBottom = "10px";
+      row.classList.add("is-push");
+    });
+    window.clearTimeout(interestRevealTimer);
+    window.setTimeout(() => {
+      if (list.isConnected) list.style.overflow = "visible";
+    }, 420);
+    interestRevealTimer = window.setTimeout(() => {
+      interestRevealTimer = 0;
+      if (!state || state.phase !== "confirm" || state.selectedDoctor !== doctorId || !interestsKnown(doctorId)) return;
+      renderOverlay();
+    }, 1200);
   }
 
   function openRapport() {
