@@ -17,6 +17,45 @@
   let skyTrip = null;
   let skyMinutesOverride = null;
   let contactReplyTimer = 0;
+  let doctorVoice = null;
+  const DOCTOR_VOICES = ["/audio/voice_1.mp3", "/audio/voice_2.mp3", "/audio/voice_3.mp3"];
+  const doctorVoiceClips = DOCTOR_VOICES.map((src) => {
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    audio.volume = 1;
+    return audio;
+  });
+
+  function doctorVoicePlaying() {
+    return Boolean(
+      doctorVoice
+      && (doctorVoice.dataset.hold === "1" || (!doctorVoice.paused && !doctorVoice.ended))
+    );
+  }
+
+  function playDoctorVoice() {
+    if (doctorVoicePlaying()) return;
+    const clip = doctorVoiceClips[Math.floor(Math.random() * doctorVoiceClips.length)];
+    doctorVoice = clip;
+    clip.dataset.hold = "1";
+    clip.volume = 1;
+    try {
+      if (clip.currentTime > 0 || clip.ended) clip.currentTime = 0;
+    } catch (error) {
+      /* The file may still be loading. */
+    }
+    clip.onended = () => {
+      clip.dataset.hold = "";
+      if (doctorVoice === clip) doctorVoice = null;
+    };
+    const pending = clip.play();
+    if (pending && pending.catch) {
+      pending.catch(() => {
+        clip.dataset.hold = "";
+        if (doctorVoice === clip) doctorVoice = null;
+      });
+    }
+  }
   let interestRevealTimer = 0;
   let roadLiftPx = 0;
   let hillShiftVb = 0;
@@ -314,6 +353,26 @@
     return dayClinics().some(
       (clinic) => doctorsLeft(clinic).length > 0 && G.visitCost(state.route, state.position, clinic.anchor) <= state.minutesLeft
     );
+  }
+
+  function canScoutNow() {
+    return state.minutesLeft >= G.INTEREST_MINUTES + G.VISIT_MINUTES;
+  }
+
+  function dayEndNote() {
+    if (state.minutesLeft <= 0) return "Рабочий день закончился.";
+    return `Осталось ${G.formatDuration(state.minutesLeft)}. На следующий визит уже не хватает.`;
+  }
+
+  function dayEndCardHtml() {
+    return `<button type="button" class="day-end-card" data-action="finish-day">
+      <span class="day-end-mark" aria-hidden="true"></span>
+      <span class="day-end-copy">
+        <span class="day-end-kicker">Время вышло</span>
+        <strong>Завершить день</strong>
+        <span class="day-end-note">${esc(dayEndNote())}</span>
+      </span>
+    </button>`;
   }
 
   function portfolioHtml() {
@@ -987,9 +1046,7 @@
     game.classList.toggle("has-day-end", show);
     const note = document.getElementById("day-end-note");
     if (!show || !note) return;
-    note.textContent = state.minutesLeft <= 0
-      ? "Рабочий день закончился."
-      : `Осталось ${G.formatDuration(state.minutesLeft)}. На следующую поездку и визит уже не хватает.`;
+    note.textContent = dayEndNote();
   }
 
   function placeIdForSlot(slot) {
@@ -1751,6 +1808,7 @@
         </div>
       </div>
       <div class="doctor-pick">${cards}</div>
+      ${hasMove() ? "" : dayEndCardHtml()}
       <button type="button" class="btn secondary" data-action="cancel">Уехать дальше</button>`;
   }
 
@@ -1768,17 +1826,21 @@
     const canEnter = state.minutesLeft >= total;
     const left = Math.max(0, state.minutesLeft - total);
     const known = interestsKnown(doctor.id);
-    const canScout = state.minutesLeft >= G.INTEREST_MINUTES;
+    const canScout = canScoutNow();
     const scout = known ? interestChips(doctor.id) : "";
+    const stuck = !hasMove();
     const timeNote = canEnter
       ? `На визит — 30 минут. Останется ${G.formatDuration(left)}.`
       : `На визит — 30 минут. Сейчас осталось ${G.formatDuration(state.minutesLeft)}.`;
     const scoutTime = esc(G.formatDuration(G.INTEREST_MINUTES));
     const visitTime = esc(G.formatDuration(total));
-    const learn = known
+    const learn = known || !canScout
       ? ""
-      : `<button type="button" class="btn scout btn-split" data-action="learn-interests"${canScout ? "" : " disabled"}><span class="btn-title">Узнать интересы</span><span class="btn-time">${scoutTime}</span></button>`;
-    const enter = `<button type="button" class="btn btn-split" data-action="depart"${canEnter ? "" : " disabled"}><span class="btn-title">Зайти</span><span class="btn-time">${visitTime}</span></button>`;
+      : `<button type="button" class="btn scout btn-split" data-action="learn-interests"><span class="btn-title">Узнать интересы</span><span class="btn-time">${scoutTime}</span></button>`;
+    const enter = stuck
+      ? ""
+      : `<button type="button" class="btn btn-split" data-action="depart"${canEnter ? "" : " disabled"}><span class="btn-title">Зайти</span><span class="btn-time">${visitTime}</span></button>`;
+    const end = stuck ? dayEndCardHtml() : "";
     return `<p class="eyebrow">${esc(clinic.title)}</p>
       <p class="clock-note">${esc(timeNote)}</p>
       <div class="doctor-card">
@@ -1792,6 +1854,7 @@
       ${scout}
       <div class="stack">
         ${learn ? `<div class="action-row">${learn}${enter}</div>` : enter}
+        ${end}
         <button type="button" class="btn secondary" data-action="back-doctors">К выбору врача</button>
       </div>`;
   }
@@ -1824,6 +1887,10 @@
     return rapport.reaction;
   }
 
+  function contactFaceHtml(doctor, bubble) {
+    return `<div class="contact-face"><button type="button" class="portrait-voice" data-action="doctor-voice" aria-label="Голос врача">${window.MPPortrait(doctor.id)}</button>${bubble || ""}</div>`;
+  }
+
   function contactDialogHtml() {
     const doctor = dayDoctor(state.focusDoctor);
     const rapport = state.rapport;
@@ -1835,9 +1902,7 @@
     const { first, last } = nameParts(doctor.name);
     if (rapport.pick) {
       const hobby = G.hobbyById(rapport.pick);
-      return `<div class="contact-face">${window.MPPortrait(doctor.id)}
-          <div class="comic-bubble${rapport.hit ? " is-hit" : " is-miss"}" role="status">${esc(rapport.reaction)}</div>
-        </div>
+      return `${contactFaceHtml(doctor, `<div class="comic-bubble${rapport.hit ? " is-hit" : " is-miss"}" role="status">${esc(rapport.reaction)}</div>`)}
         <p class="contact-name"><span>${esc(first)}</span> <span>${esc(last)}</span></p>
         <p class="player-line">${esc(hobby.line)}</p>
         <button type="button" class="btn" data-action="close-contact">К препарату</button>`;
@@ -1846,7 +1911,7 @@
       const hobby = G.hobbyById(id);
       return `<button type="button" class="reply" data-action="pick-reply" data-hobby="${hobby.id}">${esc(hobby.line)}</button>`;
     }).join("");
-    return `<div class="contact-face">${window.MPPortrait(doctor.id)}</div>
+    return `${contactFaceHtml(doctor)}
       <p class="contact-name"><span>${esc(first)}</span> <span>${esc(last)}</span></p>
       <div class="replies">${buttons}</div>`;
   }
@@ -1893,12 +1958,16 @@
     const cap = entry.rapport ? "" : `из ${G.formatScore(entry.maxPoints)} · `;
     const allDone = state.visited.length >= totalDoctorSlots();
     const nextLabel = allDone ? "К итогам дня" : "Дальше по маршруту";
-    const actions = !allDone && canStayHere()
-      ? `<div class="stack">
+    const actions = allDone
+      ? `<button type="button" class="btn" data-action="continue-day">${nextLabel}</button>`
+      : canStayHere()
+        ? `<div class="stack">
           <button type="button" class="btn" data-action="stay-clinic">Ещё врач здесь</button>
           <button type="button" class="btn secondary" data-action="continue-day">Уехать дальше</button>
         </div>`
-      : `<button type="button" class="btn" data-action="continue-day">${nextLabel}</button>`;
+        : hasMove()
+          ? `<button type="button" class="btn" data-action="continue-day">${nextLabel}</button>`
+          : dayEndCardHtml();
     return `<div class="result-head">
         <div>
           <p class="eyebrow">${esc(drug.name)}</p>
@@ -2048,7 +2117,7 @@
     if (!state || state.phase !== "confirm" || state.position !== state.selectedClinic) return;
     const doctorId = state.selectedDoctor;
     if (!doctorId || interestsKnown(doctorId) || doctorSeen(doctorId)) return;
-    if (state.minutesLeft < G.INTEREST_MINUTES) return;
+    if (!canScoutNow()) return;
     state.minutesLeft -= G.INTEREST_MINUTES;
     state.interestSpent += G.INTEREST_MINUTES;
     state.knownInterests.push(doctorId);
@@ -2152,6 +2221,7 @@
       reaction: G.doctorReaction(hit, Boolean(dayDoctor(rapport.doctorId).female)),
     };
     persist();
+    playDoctorVoice();
     const sheet = document.querySelector(".contact-sheet");
     if (!sheet || motionMs(1) === 0) {
       renderOverlay();
@@ -2461,7 +2531,7 @@
         <li>8 часов: с 09:00 до 17:00. Визит — 30 минут.</li>
           <li>Пять поликлиник, в каждой три врача. До поездки видны время пути и баллы, врача выбираете по приезде. От дома 20, 40, 60, 90 и 120 минут — и 20, 40, 60, 80, 100 баллов за визит.</li>
         <li>Своя специальность — 100% баллов, чужая — 50%, нелюбимый препарат — 0.</li>
-        <li>Интересы врача скрыты. Узнать их — 15 минут. Верная реплика удваивает баллы, неверная срезает ещё наполовину.</li>
+        <li>Интересы врача скрыты. Узнать их — 15 минут, и только если после этого останется время на визит. Верная реплика удваивает баллы, неверная срезает ещё наполовину.</li>
       </ol>
       <p class="block-title">Портфель</p>
       ${portfolioHtml()}
@@ -2483,6 +2553,7 @@
     else if (action === "learn-interests") learnInterests();
     else if (action === "open-rapport") openRapport();
     else if (action === "pick-reply") pickReply(button.dataset.hobby);
+    else if (action === "doctor-voice") playDoctorVoice();
     else if (action === "close-contact") closeContact();
     else if (action === "pick-drug") pickDrug(button.dataset.drug);
     else if (action === "present") present();

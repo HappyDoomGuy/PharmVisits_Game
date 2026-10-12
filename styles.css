@@ -1274,6 +1274,7 @@ h1 {
 .sheet h2 { margin: 0; font-size: 26px; letter-spacing: -0.04em; line-height: 1.1; }
 .sheet .sub { margin: 6px 0 0; color: var(--muted); }
 .sheet .clock-note { margin: 8px 0; font-weight: 700; }
+.sheet .day-end-card { margin-top: 4px; }
 .sheet .btn {
   display: block;
   width: 100%;
@@ -1479,6 +1480,19 @@ h1 {
   overflow: visible;
 }
 .contact-face .portrait { width: 168px; height: 210px; margin: 0 auto; border-radius: 28px; }
+.comic-bubble { pointer-events: none; }
+.portrait-voice {
+  display: block;
+  width: 168px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 28px;
+  background: none;
+  cursor: pointer;
+}
+.portrait-voice:hover .portrait { filter: brightness(1.05); }
+.portrait-voice:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 .contact-name {
   margin: 0 0 14px;
   font-size: 26px;
