@@ -178,30 +178,86 @@
     </ol>`;
   }
 
+  function setMenuChrome(on) {
+    document.querySelector(".shell")?.classList.toggle("is-menu", on);
+  }
+
+  function menuSceneHtml() {
+    return `<svg class="menu-scene" viewBox="0 0 460 200" aria-hidden="true">
+      <defs>
+        <radialGradient id="menuSun" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#fff6dc"/>
+          <stop offset="42%" stop-color="#ffdc7a"/>
+          <stop offset="100%" stop-color="#ffdc7a" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <circle cx="86" cy="62" r="40" fill="url(#menuSun)"/>
+      <circle cx="86" cy="62" r="13" fill="#ffdc7a"/>
+      <g fill="#fff">
+        <ellipse cx="196" cy="38" rx="26" ry="11"/>
+        <ellipse cx="182" cy="42" rx="14" ry="9"/>
+        <ellipse cx="214" cy="42" rx="16" ry="10"/>
+        <ellipse cx="330" cy="64" rx="20" ry="8"/>
+        <ellipse cx="318" cy="68" rx="11" ry="7"/>
+      </g>
+      <path d="M0 118 C90 98 150 132 230 114 C310 96 370 128 460 108 V200 H0 Z" fill="#8aa89a"/>
+      <path d="M0 146 C100 128 170 160 260 142 C340 126 400 158 460 140 V200 H0 Z" fill="#7fb356"/>
+      <path d="M0 172 C110 160 190 186 280 170 C360 156 410 184 460 170 V200 H0 Z" fill="#9dcc72"/>
+      <path d="M-8 164 C100 150 180 178 270 162 C350 148 400 174 468 160" fill="none" stroke="#243042" stroke-width="13" stroke-linecap="round"/>
+      <path d="M-8 164 C100 150 180 178 270 162 C350 148 400 174 468 160" fill="none" stroke="#f3ecdf" stroke-width="1.4" stroke-dasharray="3 9" stroke-linecap="round"/>
+      <path d="M36 156 L54 140 L72 156 Z" fill="#e14b3c"/>
+      <rect x="42" y="156" width="24" height="16" fill="#f4efe4"/>
+      <rect x="50" y="162" width="8" height="10" rx="1" fill="#6b4a34"/>
+      <rect x="292" y="112" width="48" height="8" fill="#0f766e"/>
+      <rect x="292" y="120" width="48" height="46" fill="#f7f4ee"/>
+      <circle cx="316" cy="136" r="7" fill="#fff" stroke="#e23d2f" stroke-width="1.4"/>
+      <path d="M316 132 v8 M312 136 h8" stroke="#e23d2f" stroke-width="1.4" stroke-linecap="round"/>
+      <rect x="304" y="150" width="9" height="10" fill="#c5d7ea"/>
+      <rect x="318" y="150" width="9" height="10" fill="#c5d7ea"/>
+    </svg>`;
+  }
+
   function showStart() {
     stopSkyLoop();
     roadObserver?.disconnect();
     state = null;
+    setMenuChrome(true);
     const save = loadSave();
     const app = document.getElementById("app");
-    app.innerHTML = `<section class="start">
-      <p class="eyebrow">Тренажёр медпредставителя</p>
-      <h1>Визитный день</h1>
-      <p class="lead">За 8 часов на дороге 5 врачей из 30, каждый день состав новый. Ближняя поликлиника — 20 минут и 20 баллов, дальняя — 2 часа и 100. Прыжки назад съедают день.</p>
-      <form id="start-form">
-        <label class="field">Как к вам обращаться
-          <input id="player-name" name="player" maxlength="24" autocomplete="nickname" placeholder="Имя" value="${esc(save.name)}" />
-        </label>
-        <p class="error" role="alert"></p>
-        <button class="btn" type="submit">Начать день</button>
-      </form>
-      ${save.game ? '<button class="btn secondary" type="button" data-action="continue-game">Продолжить день</button>' : ""}
-      <button class="btn secondary" type="button" data-action="show-roster">Все врачи</button>
-      ${save.best ? `<p class="best-line">Лучший результат: ${esc(G.formatScore(save.best))}</p>` : ""}
-      ${rulesListHtml()}
-      <p class="block-title">Портфель</p>
-      ${portfolioHtml()}
-      <p class="fine">Препараты вымышленные. Это учебная игра, а не реклама лекарств.</p>
+    const continueBtn = save.game
+      ? '<button class="btn secondary" type="button" data-action="continue-game">Продолжить день</button>'
+      : "";
+    app.innerHTML = `<section class="start menu">
+      <header class="menu-hero">
+        <div class="menu-hero-copy">
+          <p class="eyebrow">Тренажёр медпредставителя</p>
+          <h1>Визитный день</h1>
+          <p class="lead">За 8 часов на дороге 5 врачей из 30, каждый день состав новый. Ближняя поликлиника — 20 минут и 20 баллов, дальняя — 2 часа и 100. Прыжки назад съедают день.</p>
+        </div>
+        ${menuSceneHtml()}
+      </header>
+      <div class="menu-body">
+        <div class="menu-card">
+          <form id="start-form">
+            <label class="field">Как к вам обращаться
+              <input id="player-name" name="player" maxlength="24" autocomplete="nickname" placeholder="Имя" value="${esc(save.name)}" />
+            </label>
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Начать день</button>
+          </form>
+          <div class="menu-actions">
+            ${continueBtn}
+            <button class="btn secondary" type="button" data-action="show-roster">Все врачи</button>
+          </div>
+          ${save.best ? `<p class="menu-best"><span>Рекорд</span><strong class="num">${esc(G.formatScore(save.best))}</strong></p>` : ""}
+        </div>
+        <div class="menu-rules">${rulesListHtml()}</div>
+      </div>
+      <section class="menu-bag">
+        <p class="block-title">Портфель</p>
+        ${portfolioHtml()}
+        <p class="fine">Препараты вымышленные. Это учебная игра, а не реклама лекарств.</p>
+      </section>
     </section>`;
     renderPanels();
   }
@@ -219,6 +275,7 @@
         <p class="spec" style="color:${spec.color}">${esc(spec.label)}</p>
       </article>`;
     }).join("");
+    setMenuChrome(false);
     document.getElementById("app").innerHTML = `<section class="start roster">
       <p class="eyebrow">Справочник</p>
       <h1>Все врачи</h1>
@@ -247,6 +304,7 @@
   }
 
   function showGame() {
+    setMenuChrome(false);
     const app = document.getElementById("app");
     app.innerHTML = `<section class="game">
       <header class="topbar">
@@ -1644,6 +1702,7 @@
   }
 
   function showSummary() {
+    setMenuChrome(false);
     const save = loadSave();
     summaryBest = state.score > (save.best || 0);
     save.best = Math.max(save.best || 0, state.score);
