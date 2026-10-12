@@ -8,6 +8,7 @@
   const DOCTORS_PER_CLINIC = 3;
   const TRUNK_STOPS = 5;
   const VISIT_MINUTES = 30;
+  const INTEREST_MINUTES = 15;
   const DAY_MINUTES = 8 * 60;
   const DAY_START = 9 * 60;
   // Parent stop of each slot. 0 is home. The row is a single chain.
@@ -31,36 +32,36 @@
   };
 
   const DOCTORS = [
-    { id: 1, name: "Капелька Пульсова", specialty: "therapist", dislike: null },
-    { id: 2, name: "Скальпель Швов", specialty: "surgeon", dislike: "teralin" },
-    { id: 3, name: "Узика Скринингова", specialty: "gynecologist", dislike: null },
-    { id: 4, name: "Рефлекс Синапсов", specialty: "neurologist", dislike: "regenox" },
-    { id: 5, name: "Микстура Градусникова", specialty: "therapist", dislike: "nevral" },
-    { id: 6, name: "Наркоз Разрезов", specialty: "surgeon", dislike: null },
-    { id: 7, name: "Фолликула Циклова", specialty: "gynecologist", dislike: "teralin" },
-    { id: 8, name: "Мигрень Нервова", specialty: "neurologist", dislike: "femorin" },
-    { id: 9, name: "Таблетка Давленцева", specialty: "therapist", dislike: null },
-    { id: 10, name: "Шов Зашивин", specialty: "surgeon", dislike: "nevral" },
-    { id: 11, name: "Бинтик Перевязов", specialty: "surgeon", dislike: "teralin" },
-    { id: 12, name: "Зеркальце Осмотрова", specialty: "gynecologist", dislike: null },
-    { id: 13, name: "Бессонница Дремова", specialty: "neurologist", dislike: "regenox" },
-    { id: 14, name: "Сиропчик Отхаркин", specialty: "therapist", dislike: "femorin" },
-    { id: 15, name: "Зажим Сосудистов", specialty: "surgeon", dislike: null },
-    { id: 16, name: "Цикл Календарёв", specialty: "gynecologist", dislike: "nevral" },
-    { id: 17, name: "Вертиго Кружилина", specialty: "neurologist", dislike: null },
-    { id: 18, name: "Градусник Температуров", specialty: "therapist", dislike: "regenox" },
-    { id: 19, name: "Йод Антисептиков", specialty: "surgeon", dislike: "femorin" },
-    { id: 20, name: "Гормон Балансов", specialty: "gynecologist", dislike: null },
-    { id: 21, name: "Память Вспоминаева", specialty: "neurologist", dislike: "teralin" },
-    { id: 22, name: "Рецепт Выписанов", specialty: "therapist", dislike: null },
-    { id: 23, name: "Пластырь Царапкин", specialty: "surgeon", dislike: "nevral" },
-    { id: 24, name: "Кольпоскоп Смотров", specialty: "gynecologist", dislike: "regenox" },
-    { id: 25, name: "Тремор Дрожжин", specialty: "neurologist", dislike: null },
-    { id: 26, name: "Капсула Оболочкова", specialty: "therapist", dislike: "femorin" },
-    { id: 27, name: "Нитка Кетгутова", specialty: "surgeon", dislike: null },
-    { id: 28, name: "Овуляция Фазова", specialty: "gynecologist", dislike: "teralin" },
-    { id: 29, name: "Импульс Проводимов", specialty: "neurologist", dislike: "regenox" },
-    { id: 30, name: "Витамин Иммунов", specialty: "therapist", dislike: null },
+    { id: 1, name: "Капелька Пульсова", specialty: "therapist", dislike: null, female: true },
+    { id: 2, name: "Скальпель Швов", specialty: "surgeon", dislike: "teralin", female: false },
+    { id: 3, name: "Узика Скринингова", specialty: "gynecologist", dislike: null, female: true },
+    { id: 4, name: "Рефлекс Синапсов", specialty: "neurologist", dislike: "regenox", female: false },
+    { id: 5, name: "Микстура Градусникова", specialty: "therapist", dislike: "nevral", female: true },
+    { id: 6, name: "Наркоз Разрезов", specialty: "surgeon", dislike: null, female: false },
+    { id: 7, name: "Фолликула Циклова", specialty: "gynecologist", dislike: "teralin", female: true },
+    { id: 8, name: "Мигрень Нервова", specialty: "neurologist", dislike: "femorin", female: true },
+    { id: 9, name: "Таблетка Давленцева", specialty: "therapist", dislike: null, female: true },
+    { id: 10, name: "Шов Зашивин", specialty: "surgeon", dislike: "nevral", female: false },
+    { id: 11, name: "Бинтик Перевязов", specialty: "surgeon", dislike: "teralin", female: false },
+    { id: 12, name: "Зеркальце Осмотрова", specialty: "gynecologist", dislike: null, female: true },
+    { id: 13, name: "Бессонница Дремова", specialty: "neurologist", dislike: "regenox", female: true },
+    { id: 14, name: "Сиропчик Отхаркин", specialty: "therapist", dislike: "femorin", female: false },
+    { id: 15, name: "Зажим Сосудистов", specialty: "surgeon", dislike: null, female: false },
+    { id: 16, name: "Цикл Календарёв", specialty: "gynecologist", dislike: "nevral", female: false },
+    { id: 17, name: "Вертиго Кружилина", specialty: "neurologist", dislike: null, female: true },
+    { id: 18, name: "Градусник Температуров", specialty: "therapist", dislike: "regenox", female: false },
+    { id: 19, name: "Йод Антисептиков", specialty: "surgeon", dislike: "femorin", female: false },
+    { id: 20, name: "Гормон Балансов", specialty: "gynecologist", dislike: null, female: false },
+    { id: 21, name: "Память Вспоминаева", specialty: "neurologist", dislike: "teralin", female: true },
+    { id: 22, name: "Рецепт Выписанов", specialty: "therapist", dislike: null, female: false },
+    { id: 23, name: "Пластырь Царапкин", specialty: "surgeon", dislike: "nevral", female: false },
+    { id: 24, name: "Кольпоскоп Смотров", specialty: "gynecologist", dislike: "regenox", female: false },
+    { id: 25, name: "Тремор Дрожжин", specialty: "neurologist", dislike: null, female: false },
+    { id: 26, name: "Капсула Оболочкова", specialty: "therapist", dislike: "femorin", female: true },
+    { id: 27, name: "Нитка Кетгутова", specialty: "surgeon", dislike: null, female: true },
+    { id: 28, name: "Овуляция Фазова", specialty: "gynecologist", dislike: "teralin", female: true },
+    { id: 29, name: "Импульс Проводимов", specialty: "neurologist", dislike: "regenox", female: false },
+    { id: 30, name: "Витамин Иммунов", specialty: "therapist", dislike: null, female: false },
   ];
 
   function doctorById(id) {
@@ -83,11 +84,140 @@
     "Поликлиника «Врач на больничном»",
     "Районная поликлиника «Широкий коридор»",
     "Поликлиника «Танометр врёт»",
-    "Женская консультация «Вам на сколько?»",
+    "Женская консультация «У вас на сколько?»",
     "Поликлиника «Весёлый главврач»",
     "Травмпункт «Что ж вы так?»",
     "Поликлиника «Рецепт на удачу»",
   ];
+
+  const HOBBIES = [
+    { id: "fishing", label: "Рыбалка", line: "Рыбалка в этом сезоне удалась?" },
+    { id: "opera", label: "Опера", line: "Опера в этом месяце была?" },
+    { id: "chess", label: "Шахматы", line: "Шахматы на перерыве не забросили?" },
+    { id: "garden", label: "Огород", line: "Огород в этом году не запустили?" },
+    { id: "football", label: "Футбол", line: "Футбол вчера смотрели?" },
+    { id: "cooking", label: "Кулинария", line: "Кулинария — есть новый рецепт?" },
+    { id: "dogs", label: "Собаки", line: "Собаки дома не скучают?" },
+    { id: "cats", label: "Кошки", line: "Кошки снова командуют домом?" },
+    { id: "running", label: "Бег", line: "Бег по утрам ещё держите?" },
+    { id: "ski", label: "Лыжи", line: "Лыжи в этом году уже доставали?" },
+    { id: "detective", label: "Детективы", line: "Детективы новые уже вышли?" },
+    { id: "cars", label: "Машины", line: "Машины — новую уже обкатали?" },
+    { id: "travel", label: "Путешествия", line: "Путешествия на отпуск уже выбрали?" },
+    { id: "photo", label: "Фотография", line: "Фотография по выходным ещё жива?" },
+    { id: "yoga", label: "Йога", line: "Йога по утрам не пропускается?" },
+    { id: "dacha", label: "Дача", line: "Дача уже открыта в этом сезоне?" },
+    { id: "theatre", label: "Театр", line: "Театр — билеты на этот месяц есть?" },
+    { id: "coffee", label: "Кофе", line: "Кофе в городе вкусный нашли?" },
+    { id: "history", label: "История", line: "История — какую эпоху сейчас читаете?" },
+    { id: "bike", label: "Велосипед", line: "Велосипед по набережной ещё катаете?" },
+    { id: "knit", label: "Вязание", line: "Успели связать что-нибудь уютное к зиме?" },
+    { id: "mushrooms", label: "Грибы", line: "Грибы в лесу уже пошли?" },
+    { id: "guitar", label: "Гитара", line: "Гитара по вечерам не пылится?" },
+    { id: "pool", label: "Бассейн", line: "В бассейне по выходным поплавать любите?" },
+    { id: "skate", label: "Скейтбординг", line: "На скейтборде пойдёте кататься в субботу?" },
+    { id: "baking", label: "Выпечка", line: "Выпечка на неделе удалась?" },
+    { id: "hiking", label: "Походы", line: "Походы на ближайшие выходные планируете?" },
+    { id: "cinema", label: "Кино", line: "Кино на выходных какое-нибудь смотрели?" },
+    { id: "aquarium", label: "Аквариум", line: "Аквариум дома не бунтует?" },
+    { id: "tennis", label: "Теннис", line: "В теннис по выходным ещё играете?" },
+  ];
+
+  function hobbyById(id) {
+    return HOBBIES.find((hobby) => hobby.id === id) || null;
+  }
+
+  function shuffle(list, rng) {
+    const copy = list.slice();
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rng() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  function pickDoctorInterests(doctorIds, random) {
+    const rng = random || Math.random;
+    const interests = {};
+    doctorIds.forEach((id) => {
+      interests[id] = shuffle(HOBBIES.map((hobby) => hobby.id), rng).slice(0, 3);
+    });
+    return interests;
+  }
+
+  function rapportOptions(hobbyIds, random) {
+    const rng = random || Math.random;
+    const owned = hobbyIds.slice();
+    const hit = owned[Math.floor(rng() * owned.length)];
+    const decoys = shuffle(
+      HOBBIES.map((hobby) => hobby.id).filter((id) => !owned.includes(id)),
+      rng
+    ).slice(0, 3);
+    return shuffle([hit].concat(decoys), rng);
+  }
+
+  function applyRapport(points, rapport) {
+    if (rapport === "hit") return points * 2;
+    if (rapport === "miss") return points / 2;
+    return points;
+  }
+
+  const WARM_REPLIES = [
+    { m: "Я как раз об этом думал на обходе.", f: "Я как раз об этом думала на обходе." },
+    { m: "Ну надо же. Я вас почти зауважал.", f: "Ну надо же. Я вас почти зауважала." },
+    { m: "Убедили. Сегодня я добрый.", f: "Убедили. Сегодня я добрая." },
+    { m: "Продолжайте. Я даже ручку отложил.", f: "Продолжайте. Я даже ручку отложила." },
+    { m: "Редкость. Я такого захода не ждал.", f: "Редкость. Я такого захода не ждала." },
+    { m: "Попали. Я даже улыбнулся.", f: "Попали. Я даже улыбнулась." },
+    { m: "Приятно. Я уже был готов слушать про скидки.", f: "Приятно. Я уже была готова слушать про скидки." },
+    { m: "Хорошо зашли. Я на минуту ваш.", f: "Хорошо зашли. Я на минуту ваша." },
+    { m: "Оставьте визитку. Я заинтересовался.", f: "Оставьте визитку. Я заинтересовалась." },
+    { m: "Вот это заход. Я даже очередь забыл.", f: "Вот это заход. Я даже очередь забыла." },
+    { m: "Совпадение? Не верю. Но я рад.", f: "Совпадение? Не верю. Но я рада." },
+    { m: "Можно было и раньше. Я бы дослушал.", f: "Можно было и раньше. Я бы дослушала." },
+    { m: "Ладно. Я настроен слушать.", f: "Ладно. Я настроена слушать." },
+    { m: "Так, это интересно. Я отложил историю болезни.", f: "Так, это интересно. Я отложила историю болезни." },
+    { m: "Наконец-то не с порога. Я даже сел ровнее.", f: "Наконец-то не с порога. Я даже села ровнее." },
+    { m: "Хм. Я такого не ожидал.", f: "Хм. Я такого не ожидала." },
+    { m: "Садитесь ближе. Я вас почти впустил в тему.", f: "Садитесь ближе. Я вас почти впустила в тему." },
+    { m: "Обычно про хобби врут. Сегодня я поверил.", f: "Обычно про хобби врут. Сегодня я поверила." },
+  ];
+
+  const COLD_REPLIES = [
+    { m: "Мимо. Я даже бровь не поднял.", f: "Мимо. Я даже бровь не подняла." },
+    { m: "Не моё. Я этим не увлекался.", f: "Не моё. Я этим не увлекалась." },
+    { m: "Наугад. Я это уже слышал.", f: "Наугад. Я это уже слышала." },
+    { m: "Нет. Я даже не удивился.", f: "Нет. Я даже не удивилась." },
+    { m: "Лучше бы про дозировку. Я уже настроился на дело.", f: "Лучше бы про дозировку. Я уже настроилась на дело." },
+    { m: "Улыбка засчитана. Я не повёлся.", f: "Улыбка засчитана. Я не повелась." },
+    { m: "Кивну из вежливости. Я не впечатлён.", f: "Кивну из вежливости. Я не впечатлена." },
+    { m: "Оставим это. Я ждал препарат.", f: "Оставим это. Я ждала препарат." },
+    { m: "Не сегодня. Я закрыл тему.", f: "Не сегодня. Я закрыла тему." },
+    { m: "Старались. Я остался холоден.", f: "Старались. Я осталась холодна." },
+    { m: "Кабинет не для этого. Я уже открыл карту.", f: "Кабинет не для этого. Я уже открыла карту." },
+    { m: "Тема закрыта. Я вспомнил про очередь.", f: "Тема закрыта. Я вспомнила про очередь." },
+    { m: "Мимо кассы. Я не заинтересовался.", f: "Мимо кассы. Я не заинтересовалась." },
+    { m: "Вы не по адресу. Я таким не жил.", f: "Вы не по адресу. Я таким не жила." },
+    { m: "Второй попытки не будет. Я решил.", f: "Второй попытки не будет. Я решила." },
+    { m: "Здесь я на это не клюнул.", f: "Здесь я на это не клюнула." },
+    { m: "Жаль секунд. Я их уже списал.", f: "Жаль секунд. Я их уже списала." },
+    { m: "Брови на месте. Я не купился.", f: "Брови на месте. Я не купилась." },
+  ];
+
+  const MALE_MARK = /(?<![\p{L}])(думал|зауважал|добрый|отложил|ждал|улыбнулся|готов|заинтересовался|забыл|рад|дослушал|настроен|ожидал|впустил|поверил|поднял|увлекался|слышал|удивился|настроился|повёлся|впечатлён|открыл|вспомнил|решил|клюнул|списал|купился|жил|холоден|сел)(?![\p{L}])/u;
+  const FEMALE_MARK = /(?<![\p{L}])(думала|зауважала|добрая|отложила|ждала|улыбнулась|готова|заинтересовалась|забыла|рада|дослушала|настроена|ожидала|впустила|поверила|подняла|увлекалась|слышала|удивилась|настроилась|повелась|впечатлена|открыла|вспомнила|решила|клюнула|списала|купилась|жила|холодна|села|ваша)(?![\p{L}])/u;
+
+  function doctorReaction(hit, female, random) {
+    const rng = random || Math.random;
+    const pool = hit ? WARM_REPLIES : COLD_REPLIES;
+    const line = pool[Math.floor(rng() * pool.length)];
+    return female ? line.f : line.m;
+  }
+
+  function reactionAgrees(text, female) {
+    if (!text) return false;
+    return female ? !MALE_MARK.test(text) : !FEMALE_MARK.test(text);
+  }
 
   function pickClinicNames(random) {
     const rng = random || Math.random;
@@ -367,6 +497,50 @@
     const everyDoctor = chained + VISIT_MINUTES * ROAD_STOPS * DOCTORS_PER_CLINIC;
     if (everyDoctor <= DAY_MINUTES) errors.push("every doctor fits");
 
+    if (HOBBIES.length < 12) errors.push("hobbies");
+    if (new Set(HOBBIES.map((hobby) => hobby.id)).size !== HOBBIES.length) errors.push("hobby ids");
+    if (new Set(HOBBIES.map((hobby) => hobby.label)).size !== HOBBIES.length) errors.push("hobby labels");
+    HOBBIES.forEach((hobby) => {
+      const spoken = hobby.id === "pool" || hobby.id === "knit" || hobby.id === "tennis" || hobby.id === "skate";
+      if (!hobby.line.trim()) errors.push(`hobby line ${hobby.id}`);
+      if (!spoken && !hobby.line.startsWith(hobby.label)) errors.push(`hobby line ${hobby.id}`);
+    });
+    const interestIds = DOCTORS.map((doctor) => doctor.id);
+    const drawn = pickDoctorInterests(interestIds, () => 0.3);
+    interestIds.forEach((id) => {
+      const list = drawn[id];
+      if (!list || list.length !== 3 || new Set(list).size !== 3) errors.push(`interests ${id}`);
+      if (list && list.some((hobbyId) => !hobbyById(hobbyId))) errors.push(`interest pool ${id}`);
+    });
+    const sample = drawn[1];
+    const options = rapportOptions(sample, () => 0.2);
+    if (options.length !== 4 || new Set(options).size !== 4) errors.push("rapport size");
+    const hits = options.filter((id) => sample.includes(id));
+    if (hits.length !== 1) errors.push("rapport hit");
+    if (applyRapport(100, "hit") !== 200) errors.push("rapport double");
+    if (applyRapport(50, "hit") !== 100) errors.push("rapport double half");
+    if (applyRapport(100, "miss") !== 50) errors.push("rapport miss");
+    if (applyRapport(50, "miss") !== 25) errors.push("rapport miss again");
+    if (applyRapport(0, "hit") !== 0 || applyRapport(0, "miss") !== 0) errors.push("rapport zero");
+    if (applyRapport(100, null) !== 100) errors.push("rapport skip");
+    if (WARM_REPLIES.length < 12 || COLD_REPLIES.length < 12) errors.push("reactions");
+    [WARM_REPLIES, COLD_REPLIES].forEach((pool) => {
+      pool.forEach((line) => {
+        if (!line.m || !line.f || line.m === line.f) errors.push("reaction pair");
+        if (!reactionAgrees(line.m, false) || !reactionAgrees(line.f, true)) errors.push(`reaction gender ${line.m}`);
+      });
+    });
+    if (new Set(WARM_REPLIES.map((line) => line.m)).size !== WARM_REPLIES.length) errors.push("warm unique");
+    if (new Set(COLD_REPLIES.map((line) => line.f)).size !== COLD_REPLIES.length) errors.push("cold unique");
+    if (doctorReaction(true, false, () => 0) !== WARM_REPLIES[0].m) errors.push("warm male");
+    if (doctorReaction(true, true, () => 0) !== WARM_REPLIES[0].f) errors.push("warm female");
+    if (doctorReaction(false, false, () => 0) !== COLD_REPLIES[0].m) errors.push("cold male");
+    if (doctorReaction(false, true, () => 0) !== COLD_REPLIES[0].f) errors.push("cold female");
+    if (doctorById(17).female !== true || doctorById(2).female !== false) errors.push("doctor gender");
+    const women = DOCTORS.filter((doctor) => doctor.female).length;
+    const men = DOCTORS.filter((doctor) => doctor.female === false).length;
+    if (women + men !== 30) errors.push("gender flags");
+
     return errors;
   }
 
@@ -375,6 +549,7 @@
     DOCTORS_PER_CLINIC,
     TRUNK_STOPS,
     VISIT_MINUTES,
+    INTEREST_MINUTES,
     DAY_MINUTES,
     DAY_START,
     DRUGS,
@@ -384,6 +559,13 @@
     drugById,
     specialtyOf,
     CLINIC_NAMES,
+    HOBBIES,
+    hobbyById,
+    pickDoctorInterests,
+    rapportOptions,
+    applyRapport,
+    doctorReaction,
+    reactionAgrees,
     pickClinicNames,
     pickRoute,
     pointsForSlot,

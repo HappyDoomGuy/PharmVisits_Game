@@ -16,6 +16,7 @@
   let skyRafId = 0;
   let skyTrip = null;
   let skyMinutesOverride = null;
+  let contactReplyTimer = 0;
   let roadLiftPx = 0;
   let hillShiftVb = 0;
   let roadSamples = [];
@@ -140,12 +141,17 @@
   }
 
   function freshState(name) {
+    const route = G.pickRoute();
     return {
       screen: "game",
       name,
       position: 0,
-      route: G.pickRoute(),
+      route,
       clinicNames: G.pickClinicNames(),
+      interests: G.pickDoctorInterests(route.flat()),
+      knownInterests: [],
+      rapport: null,
+      interestSpent: 0,
       minutesLeft: G.DAY_MINUTES,
       score: 0,
       visited: [],
@@ -176,14 +182,78 @@
   }
 
   function ensureClinicNames() {
+    const renamedFrom = "Женская консультация «Вам на сколько?»";
+    const renamedTo = "Женская консультация «У вас на сколько?»";
+    let renamed = false;
+    if (Array.isArray(state?.clinicNames)) {
+      state.clinicNames = state.clinicNames.map((name) => {
+        if (name !== renamedFrom) return name;
+        renamed = true;
+        return renamedTo;
+      });
+    }
     const names = state?.clinicNames;
     const ok = Array.isArray(names)
       && names.length === G.ROAD_STOPS
       && new Set(names).size === G.ROAD_STOPS
       && names.every((name) => G.CLINIC_NAMES.includes(name));
-    if (ok) return false;
+    if (ok) return renamed;
     state.clinicNames = G.pickClinicNames();
     return true;
+  }
+
+  function interestsOf(doctorId) {
+    const list = state.interests && state.interests[doctorId];
+    return Array.isArray(list) ? list : [];
+  }
+
+  function interestsKnown(doctorId) {
+    return Array.isArray(state.knownInterests) && state.knownInterests.includes(doctorId);
+  }
+
+  function ensureInterests() {
+    const ids = state.route.flat();
+    const bag = state.interests;
+    let changed = false;
+    if (bag && typeof bag === "object") {
+      ids.forEach((id) => {
+        const list = bag[id];
+        if (!Array.isArray(list) || !list.includes("crossword")) return;
+        bag[id] = list.map((hobbyId) => (hobbyId === "crossword" ? "skate" : hobbyId));
+        changed = true;
+      });
+    }
+    if (state.rapport) {
+      if (Array.isArray(state.rapport.options) && state.rapport.options.includes("crossword")) {
+        state.rapport.options = state.rapport.options.map((hobbyId) => (hobbyId === "crossword" ? "skate" : hobbyId));
+        changed = true;
+      }
+      if (state.rapport.pick === "crossword") {
+        state.rapport.pick = "skate";
+        changed = true;
+      }
+    }
+    const ok = bag && typeof bag === "object" && ids.every((id) => {
+      const list = bag[id];
+      return Array.isArray(list)
+        && list.length === 3
+        && new Set(list).size === 3
+        && list.every((hobbyId) => G.hobbyById(hobbyId));
+    });
+    if (!ok) {
+      state.interests = G.pickDoctorInterests(ids);
+      state.knownInterests = [];
+      changed = true;
+    }
+    if (!Array.isArray(state.knownInterests)) {
+      state.knownInterests = [];
+      changed = true;
+    }
+    if (!Number.isFinite(state.interestSpent)) {
+      state.interestSpent = 0;
+      changed = true;
+    }
+    return changed;
   }
 
   function dayClinics() {
@@ -257,6 +327,7 @@
       <li><b>1</b><p>День с 09:00 до 17:00. Время уходит на дорогу и на визит.<span>До поездки видны только время пути и баллы. Врача выбираете по приезде. После визита можно зайти к другому врачу здесь или уехать дальше.</span></p></li>
       <li><b>2</b><p>Пять поликлиник стоят вдоль дороги. В каждой — три врача.<span>От дома: 20 минут и 20 баллов, 40 минут и 40, час и 60, полтора часа и 80, два часа и 100. Каждый визит приносит баллы этой поликлиники. Повторный заход без дороги — ещё 30 минут.</span></p></li>
       <li><b>3</b><p>Препарат по специальности — все баллы уровня.<span>Другая специальность — половина. Нелюбимый препарат — ноль.</span></p></li>
+      <li><b>4</b><p>У каждого врача три интереса, заранее их не видно.<span>«Узнать интересы» стоит 15 минут, после этого они на карточке. Перед препаратом можно «Наладить контакт»: верная реплика удваивает баллы визита, неверная срезает их ещё наполовину.</span></p></li>
     </ol>`;
   }
 
@@ -385,13 +456,16 @@
         <p class="spec" style="color:${spec.color}">${esc(spec.label)}</p>
       </article>`;
     }).join("");
+    const lines = G.HOBBIES.map((hobby) => `<article class="roster-line"><b>${esc(hobby.label)}</b><span>${esc(hobby.line)}</span></article>`).join("");
     setMenuChrome(false);
     document.getElementById("app").innerHTML = `<section class="start roster">
       <p class="eyebrow">Справочник</p>
       <h1>Врачи и поликлиники</h1>
-      <p class="lead">${G.CLINIC_NAMES.length} лечебных учреждений. Каждый день на дорогу попадают пять из них, в каждом три врача.</p>
+      <p class="lead">${G.CLINIC_NAMES.length} лечебных учреждений и ${G.HOBBIES.length} интересов. Каждый день на дорогу попадают пять учреждений, в каждом три врача и три случайных интереса.</p>
       <p class="block-title">Поликлиники</p>
       <div class="roster-places">${places}</div>
+      <p class="block-title">Интересы и реплики</p>
+      <div class="roster-lines">${lines}</div>
       <p class="block-title">Врачи</p>
       <div class="roster-grid">${cards}</div>
       <button class="btn" type="button" data-action="new-day">В меню</button>
@@ -411,7 +485,7 @@
     const save = loadSave();
     if (!save.game) return;
     state = save.game;
-    if (ensureClinicNames()) persist();
+    if (ensureClinicNames() || ensureInterests()) persist();
     if (state.phase === "travel") {
       state.phase = "confirm";
       state.selectedClinic = state.position;
@@ -1579,7 +1653,13 @@
       return;
     }
     overlay.hidden = false;
-    overlay.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${sheetHtml()}</div>`;
+    const contact = contactOpen();
+    overlay.classList.toggle("has-contact", contact);
+    const visitSheet = `<div class="sheet${contact ? " is-behind" : ""}" role="dialog"${contact ? "" : ' aria-modal="true"'}>${sheetHtml()}</div>`;
+    const contactSheet = contact
+      ? `<div class="sheet contact-sheet" role="dialog" aria-modal="true">${contactDialogHtml()}</div>`
+      : "";
+    overlay.innerHTML = visitSheet + contactSheet;
   }
 
   function sheetHtml() {
@@ -1623,9 +1703,21 @@
     }).join("");
     return `<p class="eyebrow">${esc(clinic.title)}</p>
       <h2>Кого посетить</h2>
-      <p class="clock-note">Визит — 30 минут, без дороги.</p>
+      <p class="clock-note">На визит — 30 минут.</p>
+      <ul class="outcomes">
+        <li><span>Препарат по специальности</span><b>${esc(G.formatScore(clinic.points))}</b></li>
+        <li><span>Другая специальность</span><b>${esc(G.formatScore(clinic.points / 2))}</b></li>
+        <li><span>Нелюбимый препарат</span><b>0</b></li>
+      </ul>
+      <p class="sub">Занимательная беседа по интересам удваивает баллы, если врачу не интересно — лишь половина баллов.</p>
       <div class="doctor-pick">${cards}</div>
       <button type="button" class="btn secondary" data-action="cancel">Уехать дальше</button>`;
+  }
+
+  function interestChips(doctorId) {
+    if (!interestsKnown(doctorId)) return "";
+    const items = interestsOf(doctorId).map((id) => `<li>${esc(G.hobbyById(id).label)}</li>`).join("");
+    return `<ul class="interests-row">${items}</ul>`;
   }
 
   function doctorCardHtml(clinic, doctor) {
@@ -1633,32 +1725,92 @@
     const dislike = doctor.dislike ? G.drugById(doctor.dislike) : null;
     const { first, last } = nameParts(doctor.name);
     const total = G.VISIT_MINUTES;
-    const left = state.minutesLeft - total;
+    const canEnter = state.minutesLeft >= total;
+    const left = Math.max(0, state.minutesLeft - total);
+    const known = interestsKnown(doctor.id);
+    const canScout = state.minutesLeft >= G.INTEREST_MINUTES;
+    const scout = known ? interestChips(doctor.id) : "";
+    const timeNote = canEnter
+      ? `На визит — 30 минут. Останется ${G.formatDuration(left)}.`
+      : `На визит — 30 минут. Сейчас осталось ${G.formatDuration(state.minutesLeft)}.`;
+    const learn = known
+      ? ""
+      : `<button type="button" class="btn scout" data-action="learn-interests"${canScout ? "" : " disabled"}>Узнать интересы (−15 минут)</button>`;
     return `<p class="eyebrow">${esc(clinic.title)}</p>
+      <p class="clock-note">${esc(timeNote)}</p>
       <div class="doctor-card">
         ${window.MPPortrait(doctor.id)}
         <div>
-          <p class="spec" style="--spec:${spec.color}">${esc(spec.label)}</p>
           <h2><span class="first">${esc(first)}</span><span class="last">${esc(last)}</span></h2>
+          <p class="spec" style="--spec:${spec.color}">${esc(spec.label)}</p>
         </div>
       </div>
-      ${dislike ? `<p class="warn">Не назначает <b>${esc(dislike.name)}</b>.</p>` : `<p class="sub">Назначает любой препарат из портфеля.</p>`}
-      <ul class="outcomes">
-        <li><span>Препарат по специальности</span><b>${esc(G.formatScore(doctor.points))}</b></li>
-        <li><span>Другая специальность</span><b>${esc(G.formatScore(doctor.points / 2))}</b></li>
-        <li><span>Нелюбимый препарат</span><b>0</b></li>
-      </ul>
-      <p class="clock-note">Визит — 30 минут. После него на часах ${G.formatClock(minutesUsed() + total)}, останется ${esc(G.formatDuration(left))}.</p>
+      ${dislike ? `<p class="gold-banner">Не назначает <b>${esc(dislike.name)}</b>.</p>` : `<p class="gold-chip">Назначает любой препарат из портфеля.</p>`}
+      ${scout}
       <div class="stack">
-        <button type="button" class="btn" data-action="depart">Зайти · ${esc(G.formatDuration(total))}</button>
+        ${learn
+          ? `<div class="action-row">${learn}<button type="button" class="btn" data-action="depart"${canEnter ? "" : " disabled"}>Зайти · ${esc(G.formatDuration(total))}</button></div>`
+          : `<button type="button" class="btn" data-action="depart"${canEnter ? "" : " disabled"}>Зайти · ${esc(G.formatDuration(total))}</button>`}
         <button type="button" class="btn secondary" data-action="back-doctors">К выбору врача</button>
       </div>`;
   }
 
+  function contactOpen() {
+    const rapport = state?.rapport;
+    return Boolean(
+      state?.phase === "visit"
+      && rapport
+      && rapport.doctorId === state.focusDoctor
+      && !rapport.closed
+    );
+  }
+
+  function visitContactHtml(doctor) {
+    const rapport = state.rapport && state.rapport.doctorId === doctor.id ? state.rapport : null;
+    if (rapport && rapport.pick && rapport.closed) {
+      const reaction = voicedReaction(doctor, rapport);
+      return `<p class="comic-note${rapport.hit ? " is-hit" : " is-miss"}">${esc(reaction)}</p>`;
+    }
+    return `<button type="button" class="btn interest" data-action="open-rapport">Наладить контакт</button>`;
+  }
+
+  function voicedReaction(doctor, rapport) {
+    const female = Boolean(doctor && doctor.female);
+    if (G.reactionAgrees(rapport.reaction, female)) return rapport.reaction;
+    rapport.reaction = G.doctorReaction(Boolean(rapport.hit), female);
+    persist();
+    return rapport.reaction;
+  }
+
+  function contactDialogHtml() {
+    const doctor = dayDoctor(state.focusDoctor);
+    const rapport = state.rapport;
+    if (rapport.pick && !G.reactionAgrees(rapport.reaction, Boolean(doctor.female))) {
+      rapport.hit = interestsOf(rapport.doctorId).includes(rapport.pick);
+      rapport.reaction = G.doctorReaction(rapport.hit, Boolean(doctor.female));
+      persist();
+    }
+    const { first, last } = nameParts(doctor.name);
+    if (rapport.pick) {
+      const hobby = G.hobbyById(rapport.pick);
+      return `<div class="contact-face">${window.MPPortrait(doctor.id)}
+          <div class="comic-bubble${rapport.hit ? " is-hit" : " is-miss"}" role="status">${esc(rapport.reaction)}</div>
+        </div>
+        <p class="contact-name"><span>${esc(first)}</span> <span>${esc(last)}</span></p>
+        <p class="player-line">${esc(hobby.line)}</p>
+        <button type="button" class="btn" data-action="close-contact">К препарату</button>`;
+    }
+    const buttons = rapport.options.map((id) => {
+      const hobby = G.hobbyById(id);
+      return `<button type="button" class="reply" data-action="pick-reply" data-hobby="${hobby.id}">${esc(hobby.line)}</button>`;
+    }).join("");
+    return `<div class="contact-face">${window.MPPortrait(doctor.id)}</div>
+      <p class="contact-name"><span>${esc(first)}</span> <span>${esc(last)}</span></p>
+      <div class="replies">${buttons}</div>`;
+  }
+
   function visitHtml() {
     const doctor = dayDoctor(state.focusDoctor);
-    const spec = G.specialtyOf(doctor.specialty);
-    const dislike = doctor.dislike ? G.drugById(doctor.dislike) : null;
     const drugs = G.DRUGS.map((drug) => {
       const drugSpec = G.specialtyOf(drug.specialty);
       const picked = state.selectedDrug === drug.id;
@@ -1671,10 +1823,10 @@
         <div>
           <p class="eyebrow">Визит</p>
           <h2>${esc(doctor.name)}</h2>
-          <p class="sub">${esc(spec.label)}. ${(state.pending?.travel || 0) > 0 ? "Время дороги и визита уже списано." : "Дорога не нужна: списаны 30 минут визита."} Сейчас ${G.formatClock(minutesUsed())}.</p>
+          <p class="sub">Визит занял 30 минут, осталось ${esc(G.formatDuration(state.minutesLeft))}.</p>
         </div>
       </div>
-      ${dislike ? `<p class="warn">Не назначает <b>${esc(dislike.name)}</b>.</p>` : ""}
+      ${visitContactHtml(doctor)}
       <p class="block-title">Какой препарат рассказать</p>
       <div class="drugs">${drugs}</div>
       <button type="button" class="btn" data-action="present" ${state.selectedDrug ? "" : "disabled"}>Рассказать о препарате</button>`;
@@ -1691,6 +1843,12 @@
       half: `${drug.name} — препарат другой специальности. За визит начисляется половина.`,
       dislike: `${doctor.name.split(" ")[0]} не назначает ${drug.name}.`,
     };
+    let detail = texts[entry.outcome];
+    if (entry.rapport === "hit" && entry.drugPoints > 0) detail += " Реплика попала в интересы, баллы удвоены.";
+    else if (entry.rapport === "miss" && entry.drugPoints > 0) detail += " Реплика мимо интересов, баллы срезаны ещё наполовину.";
+    else if (entry.rapport === "hit") detail += " Реплика попала в интересы.";
+    else if (entry.rapport === "miss") detail += " Реплика мимо интересов.";
+    const cap = entry.rapport ? "" : `из ${G.formatScore(entry.maxPoints)} · `;
     const allDone = state.visited.length >= totalDoctorSlots();
     const nextLabel = allDone ? "К итогам дня" : "Дальше по маршруту";
     const actions = !allDone && canStayHere()
@@ -1707,7 +1865,7 @@
         <div class="stamp ${entry.outcome}">${stamps[entry.outcome]}</div>
       </div>
       <p class="result-points ${entry.outcome} num">+${esc(G.formatScore(entry.points))}</p>
-      <p class="sub">из ${esc(G.formatScore(entry.maxPoints))} · ${esc(texts[entry.outcome])}</p>
+      <p class="sub">${esc(cap + detail)}</p>
       <p class="clock-note">Счёт ${esc(G.formatScore(state.score))}. На часах ${G.formatClock(minutesUsed())}, ещё ${esc(G.formatDuration(state.minutesLeft))}.</p>
       ${actions}`;
   }
@@ -1821,6 +1979,7 @@
     state.pending = { doctorId: doctor.id, travel };
     state.focusDoctor = doctor.id;
     state.selectedDrug = null;
+    state.rapport = null;
     state.selectedDoctor = null;
     state.selectedClinic = null;
     state.phase = "visit";
@@ -1843,26 +2002,158 @@
     if (present) present.disabled = false;
   }
 
+  function learnInterests() {
+    if (!state || state.phase !== "confirm" || state.position !== state.selectedClinic) return;
+    const doctorId = state.selectedDoctor;
+    if (!doctorId || interestsKnown(doctorId) || doctorSeen(doctorId)) return;
+    if (state.minutesLeft < G.INTEREST_MINUTES) return;
+    state.minutesLeft -= G.INTEREST_MINUTES;
+    state.interestSpent += G.INTEREST_MINUTES;
+    state.knownInterests.push(doctorId);
+    persist();
+    updateHud();
+    updateStops();
+    renderOverlay();
+  }
+
+  function openRapport() {
+    if (state.phase !== "visit" || !state.focusDoctor) return;
+    if (state.rapport && state.rapport.doctorId === state.focusDoctor) {
+      if (state.rapport.closed && state.rapport.pick) return;
+      if (!state.rapport.closed) return;
+    }
+    const hobbies = interestsOf(state.focusDoctor);
+    if (hobbies.length !== 3) return;
+    state.rapport = {
+      doctorId: state.focusDoctor,
+      options: G.rapportOptions(hobbies),
+      pick: null,
+      hit: null,
+      reaction: null,
+      closed: false,
+    };
+    persist();
+    renderOverlay();
+  }
+
+  function pickReply(id) {
+    const rapport = state.rapport;
+    if (!contactOpen() || rapport.pick) return;
+    if (!rapport.options.includes(id) || !G.hobbyById(id)) return;
+    const hit = interestsOf(rapport.doctorId).includes(id);
+    state.rapport = {
+      ...rapport,
+      pick: id,
+      hit,
+      reaction: G.doctorReaction(hit, Boolean(dayDoctor(rapport.doctorId).female)),
+    };
+    persist();
+    const sheet = document.querySelector(".contact-sheet");
+    if (!sheet || motionMs(1) === 0) {
+      renderOverlay();
+      return;
+    }
+    revealContactReply(sheet);
+  }
+
+  function revealContactReply(sheet) {
+    const rapport = state.rapport;
+    const hobby = G.hobbyById(rapport.pick);
+    const replies = sheet.querySelector(".replies");
+    const face = sheet.querySelector(".contact-face");
+    if (!replies || !face || !hobby) {
+      renderOverlay();
+      return;
+    }
+    replies.querySelectorAll(".reply").forEach((button) => {
+      button.disabled = true;
+      button.classList.add("is-out");
+    });
+    const bubble = document.createElement("div");
+    bubble.className = `comic-bubble${rapport.hit ? " is-hit" : " is-miss"} is-pop`;
+    bubble.setAttribute("role", "status");
+    bubble.textContent = rapport.reaction;
+    face.appendChild(bubble);
+    const after = document.createElement("div");
+    after.className = "contact-after";
+    after.innerHTML = `<p class="player-line">${esc(hobby.line)}</p><button type="button" class="btn" data-action="close-contact">К препарату</button>`;
+    after.style.overflow = "hidden";
+    after.style.maxHeight = "0px";
+    after.style.opacity = "0";
+    replies.after(after);
+    const afterHeight = after.scrollHeight;
+    replies.style.overflow = "hidden";
+    replies.style.maxHeight = `${replies.offsetHeight}px`;
+    sheet.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      replies.style.transition = "max-height .42s ease, opacity .26s ease, margin .42s ease";
+      replies.style.maxHeight = "0px";
+      replies.style.opacity = "0";
+      replies.style.margin = "0";
+      after.style.transition = "max-height .42s ease, opacity .34s ease .06s";
+      after.style.maxHeight = `${afterHeight}px`;
+      after.style.opacity = "1";
+      bubble.classList.add("is-in");
+    });
+    window.clearTimeout(contactReplyTimer);
+    contactReplyTimer = window.setTimeout(() => {
+      contactReplyTimer = 0;
+      if (!contactOpen() || !state.rapport?.pick) return;
+      const current = document.querySelector(".contact-sheet");
+      const height = current ? current.offsetHeight : 0;
+      renderOverlay();
+      const next = document.querySelector(".contact-sheet");
+      if (!next || !height) return;
+      const target = next.offsetHeight;
+      if (Math.abs(target - height) < 3) return;
+      next.style.height = `${height}px`;
+      next.style.transition = "height .22s ease";
+      requestAnimationFrame(() => {
+        next.style.height = `${target}px`;
+      });
+      window.setTimeout(() => {
+        if (!next.isConnected) return;
+        next.style.height = "";
+        next.style.transition = "";
+      }, 260);
+    }, 480);
+  }
+
+  function closeContact() {
+    if (!contactOpen()) return;
+    if (!state.rapport.pick) state.rapport = null;
+    else state.rapport = { ...state.rapport, closed: true };
+    persist();
+    renderOverlay();
+  }
+
   function present() {
     if (state.phase !== "visit" || !state.selectedDrug) return;
     skyMinutesOverride = null;
     const doctor = dayDoctor(state.focusDoctor);
     const drug = G.drugById(state.selectedDrug);
     const result = G.scoreVisit(doctor, drug.id);
-    state.score += result.points;
+    const rapport = state.rapport && state.rapport.doctorId === doctor.id && state.rapport.pick
+      ? (interestsOf(doctor.id).includes(state.rapport.pick) ? "hit" : "miss")
+      : null;
+    const points = G.applyRapport(result.points, rapport);
+    state.score += points;
     if (!state.visited.includes(doctor.id)) state.visited.push(doctor.id);
     const entry = {
       doctorId: doctor.id,
       drugId: drug.id,
-      points: result.points,
+      points,
+      drugPoints: result.points,
       maxPoints: doctor.points,
       outcome: result.outcome,
+      rapport,
       travel: state.pending?.travel ?? G.travelMinutes(state.route, 0, clinicByAnchor(state.position)?.anchor ?? 0),
     };
     state.log.push(entry);
     state.lastResult = entry;
     state.pending = null;
     state.selectedDrug = null;
+    state.rapport = null;
     state.phase = "result";
     persist();
     updateHud();
@@ -1870,7 +2161,7 @@
     renderOverlay();
     renderPanels();
     const live = document.getElementById("live");
-    if (live) live.textContent = `${doctor.name}: ${result.points} баллов. Счёт ${state.score}.`;
+    if (live) live.textContent = `${doctor.name}: ${points} баллов. Счёт ${state.score}.`;
   }
 
   function stayClinic() {
@@ -1935,7 +2226,8 @@
   }
 
   function showSummary() {
-    setMenuChrome(false);
+    stopSkyLoop();
+    setMenuChrome(true);
     const save = loadSave();
     summaryBest = state.score > (save.best || 0);
     save.best = Math.max(save.best || 0, state.score);
@@ -1949,13 +2241,19 @@
   }
 
   function lostPoints() {
-    return state.log.reduce((sum, item) => sum + (item.maxPoints - item.points), 0);
+    return state.log.reduce((sum, item) => {
+      const drugPoints = Number.isFinite(item.drugPoints) ? item.drugPoints : item.points;
+      return sum + Math.max(0, item.maxPoints - drugPoints);
+    }, 0);
   }
 
   function coaching() {
     const tips = [];
     if (state.log.some((item) => item.outcome === "dislike")) {
       tips.push("Перед презентацией смотрите, какой препарат врач не назначает.");
+    }
+    if (state.log.some((item) => item.rapport === "miss")) {
+      tips.push("Реплика мимо интересов срезает баллы ещё наполовину. Интересы можно узнать за 15 минут до визита.");
     }
     if (state.log.some((item) => item.outcome === "half")) {
       tips.push("Половина баллов — препарат не той специальности. Терапевт — Тералин, гинеколог — Феморин, невролог — Невролекс, хирург — Регенокс.");
@@ -1975,28 +2273,63 @@
 
   function summaryHtml() {
     const grade = G.grade(state.score);
+    const save = loadSave();
     const missed = dayClinics()
       .map((clinic) => ({ ...clinic, left: doctorsLeft(clinic) }))
       .filter((clinic) => clinic.left.length);
     const tips = coaching();
-    return `<section class="summary">
-      <p class="eyebrow">${esc(state.name)}</p>
-      <h1>${esc(grade.title)}</h1>
-      <p class="grade">${esc(grade.text)}</p>
-      ${summaryBest ? '<p class="record">Новый личный рекорд</p>' : ""}
-      <div class="stats">
-        <div class="stat"><b class="num">${esc(G.formatScore(state.score))}</b><span>баллы из ${esc(G.formatScore(G.totalPoints()))}</span></div>
-        <div class="stat"><b class="num">${state.visited.length} / ${totalDoctorSlots()}</b><span>визитов</span></div>
-        <div class="stat"><b class="num">${esc(G.formatDuration(state.travelSpent))}</b><span>в пути</span></div>
-        <div class="stat"><b class="num">${esc(G.formatDuration(state.visitSpent))}</b><span>на визитах</span></div>
-        <div class="stat"><b class="num">${esc(G.formatDuration(state.minutesLeft))}</b><span>не использовано</span></div>
-        <div class="stat"><b class="num">${esc(G.formatScore(lostPoints()))}</b><span>баллов потеряно на препарате</span></div>
+    const rows = [
+      ["Визиты", `${state.visited.length} / ${totalDoctorSlots()}`],
+      ["В пути", G.formatDuration(state.travelSpent)],
+      ["На визитах", G.formatDuration(state.visitSpent)],
+    ];
+    if (state.interestSpent) rows.push(["На интересы", G.formatDuration(state.interestSpent)]);
+    rows.push(
+      ["Не использовано", G.formatDuration(state.minutesLeft)],
+      ["Потеряно на препарате", G.formatScore(lostPoints())],
+    );
+    const stats = rows.map(([label, value]) => `<li><span>${esc(label)}</span><b class="num">${esc(value)}</b></li>`).join("");
+    const record = save.best
+      ? `<div class="menu-record"><span class="menu-record-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></span><span class="menu-record-label">${summaryBest ? "Новый рекорд" : "Рекорд"}</span><strong class="menu-record-value num">${esc(G.formatScore(save.best))}</strong></div>`
+      : "";
+    const tipBlock = tips.length
+      ? `<p class="summary-kicker">На следующий день</p><ul class="summary-tips">${tips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul>`
+      : "";
+    const journal = state.log.length
+      ? `<div class="log summary-log">${state.log.map(logCard).join("")}</div>`
+      : `<p class="summary-empty">Визитов не было.</p>`;
+    const missedLine = missed.length
+      ? `<p class="summary-miss"><b>Не посетили.</b> ${missed.map((clinic) => clinic.left.map((doctor) => esc(doctor.name)).join(", ")).join("; ")}.</p>`
+      : "";
+    return `<section class="start menu summary-menu">
+      ${menuSceneHtml()}
+      <button type="button" class="menu-roster-btn" data-action="show-roster" aria-label="Справочник" title="Справочник">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/>
+          <circle cx="10" cy="8" r="3.2"/>
+          <path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4"/>
+          <path d="M15.4 5.2a3.2 3.2 0 0 1 0 5.6"/>
+        </svg>
+      </button>
+      <div class="menu-shell">
+        <header class="menu-title">
+          <p class="eyebrow">${esc(state.name)}</p>
+          <h1>${esc(grade.title)}</h1>
+          <p class="lead">${esc(grade.text)}</p>
+        </header>
+        <div class="menu-card">
+          <div class="summary-body">
+            <p class="summary-score"><b class="num">${esc(G.formatScore(state.score))}</b><span>баллы из ${esc(G.formatScore(G.totalPoints()))}</span></p>
+            ${record}
+            <ul class="summary-stats">${stats}</ul>
+            ${tipBlock}
+            <p class="summary-kicker">Журнал</p>
+            ${journal}
+            ${missedLine}
+          </div>
+          <button type="button" class="btn" data-action="new-day">Новый день</button>
+        </div>
       </div>
-      ${tips.length ? `<ul class="tips">${tips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul>` : ""}
-      <p class="block-title">Журнал</p>
-      <div class="log">${state.log.length ? state.log.map(logCard).join("") : "<p class=\"sub\">Визитов не было.</p>"}</div>
-      ${missed.length ? `<p class="fine">Не посетили: ${missed.map((clinic) => clinic.left.map((doctor) => esc(doctor.name)).join(", ")).join("; ")}.</p>` : ""}
-      <button type="button" class="btn" data-action="new-day">Новый день</button>
     </section>`;
   }
 
@@ -2004,9 +2337,10 @@
     const doctor = G.doctorById(entry.doctorId);
     const drug = G.drugById(entry.drugId);
     const spec = G.specialtyOf(doctor.specialty);
+    const rapportBit = entry.rapport === "hit" ? " · контакт ×2" : entry.rapport === "miss" ? " · контакт мимо" : "";
     return `<article>
       <b>${esc(doctor.name)}</b>
-      <span>${esc(spec.label)} · ${esc(drug.name)} · дорога ${entry.travel} мин</span>
+      <span>${esc(spec.label)} · ${esc(drug.name)} · дорога ${entry.travel} мин${esc(rapportBit)}</span>
       <strong class="${entry.outcome} num">+${esc(G.formatScore(entry.points))}</strong>
     </article>`;
   }
@@ -2030,6 +2364,7 @@
         <li>8 часов: с 09:00 до 17:00. Визит — 30 минут.</li>
           <li>Пять поликлиник, в каждой три врача. До поездки видны время пути и баллы, врача выбираете по приезде. От дома 20, 40, 60, 90 и 120 минут — и 20, 40, 60, 80, 100 баллов за визит.</li>
         <li>Своя специальность — 100% баллов, чужая — 50%, нелюбимый препарат — 0.</li>
+        <li>Интересы врача скрыты. Узнать их — 15 минут. Верная реплика удваивает баллы, неверная срезает ещё наполовину.</li>
       </ol>
       <p class="block-title">Портфель</p>
       ${portfolioHtml()}
@@ -2048,6 +2383,10 @@
     else if (action === "back-doctors") backToDoctors();
     else if (action === "cancel") closeSoft();
     else if (action === "depart") depart();
+    else if (action === "learn-interests") learnInterests();
+    else if (action === "open-rapport") openRapport();
+    else if (action === "pick-reply") pickReply(button.dataset.hobby);
+    else if (action === "close-contact") closeContact();
     else if (action === "pick-drug") pickDrug(button.dataset.drug);
     else if (action === "present") present();
     else if (action === "stay-clinic") stayClinic();
@@ -2089,7 +2428,8 @@
       return;
     }
     if (event.target.id === "overlay") {
-      if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
+      if (contactOpen()) closeContact();
+      else if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
       else closeSoft();
       return;
     }
@@ -2100,6 +2440,7 @@
     if (event.key === "Escape") {
       if (document.getElementById("rules-modal")) closeRulesModal();
       else if (document.querySelector(".roster")) showStart();
+      else if (contactOpen()) closeContact();
       else if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
       else closeSoft();
     }
