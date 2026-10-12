@@ -1,7 +1,7 @@
 (function () {
   const G = window.MPGame;
-  const KEY = "mp-visit-day-v6";
-  const PREV_KEYS = ["mp-visit-day-v5", "mp-visit-day-v4", "mp-visit-day-v3", "mp-visit-day-v2"];
+  const KEY = "mp-visit-day-v7";
+  const PREV_KEYS = ["mp-visit-day-v6", "mp-visit-day-v5", "mp-visit-day-v4", "mp-visit-day-v3", "mp-visit-day-v2"];
 
   let state = null;
   let summaryBest = false;
@@ -37,12 +37,32 @@
   const ROAD_HILL = { base: 70, amp1: 6, amp2: 3.5, phase: 90 };
 
   function carSvg() {
-    return `<svg viewBox="0 0 52 24" aria-hidden="true">
-      <ellipse cx="14" cy="20" rx="5.5" ry="2.2" fill="#1a2030"/>
-      <ellipse cx="38" cy="20" rx="5.5" ry="2.2" fill="#1a2030"/>
-      <path d="M8 14h10l3-5h14l5 5h4v6H8Z" fill="#e23d2f"/>
-      <path d="M22 9h12l4 5H22Z" fill="#c9ecff" opacity="0.95"/>
-      <rect x="10" y="14" width="3" height="4" rx="1" fill="#2a3038"/>
+    const wheel = (cx) => `<g class="car-wheel">
+        <circle cx="${cx}" cy="31.6" r="5.8" fill="#1e2430"/>
+        <circle cx="${cx}" cy="31.6" r="2.7" fill="#f7f4ee"/>
+        <circle cx="${cx}" cy="31.6" r="1" fill="#1e2430"/>
+      </g>`;
+    return `<svg class="car" viewBox="0 0 96 42" aria-hidden="true">
+      <g class="car-spring">
+        <path d="M29.5 27.2c1.6 1.5 3.2 1.5 4.8 0s3.2-1.5 4.8 0" fill="none" stroke="#5c6573" stroke-width="1.15" stroke-linecap="round"/>
+      </g>
+      <g class="car-spring">
+        <path d="M67.5 27.2c1.6 1.5 3.2 1.5 4.8 0s3.2-1.5 4.8 0" fill="none" stroke="#5c6573" stroke-width="1.15" stroke-linecap="round"/>
+      </g>
+      <g class="car-suspension">
+        <g class="car-engine">
+          <path d="M14 28.6V23.2c0-2.2 1.8-3.8 4.2-3.8h12.2L38.6 11c1.2-1.5 3-2.4 4.9-2.4H62c2.4 0 4.2 1 5.4 3.2L74 19.4h8.2c4.2 0 7 2 7 4.6v4.2c0 1.6-1.3 2.6-3.2 2.6H17.2c-1.9 0-3.2-1-3.2-2.2z" fill="#e23d2f"/>
+          <path d="M18 27.8h62c3.2 0 6 .4 8 1.2v1.4c-2.2 1-6.4 1.6-10 1.6H26c-4 0-8-.5-10-1.4v-1.6c1.6-.8 5-1.2 8-1.2z" fill="#c43228"/>
+          <path d="M44 10.4h16" stroke="#ffb4aa" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M42.5 13.2h16.5L66.5 19H49z" fill="#e8f6fc" stroke="#c5dbe8" stroke-width="0.7" stroke-linejoin="round"/>
+          <path d="M57.2 13.4v5.4" stroke="#d4e6f0" stroke-width="0.8"/>
+          <path d="M52 19.4v8" stroke="#c43228" stroke-width="0.7"/>
+          <rect x="15.2" y="21.4" width="2.6" height="3.2" rx="0.7" fill="#ffd0c8"/>
+          <rect x="84.6" y="21.2" width="4.2" height="2.8" rx="0.9" fill="#fff6dc"/>
+        </g>
+      </g>
+      ${wheel(34)}
+      ${wheel(72)}
     </svg>`;
   }
 
@@ -94,13 +114,21 @@
     if (!game || game.screen !== "game") return false;
     if (typeof game.name !== "string" || !game.name.trim()) return false;
     if (!Array.isArray(game.route) || game.route.length !== G.ROAD_STOPS) return false;
-    const routeIds = new Set(game.route);
-    if (routeIds.size !== G.ROAD_STOPS) return false;
-    if (!game.route.every((id) => Number.isInteger(id) && G.doctorById(id))) return false;
-    if (game.position !== 0 && !routeIds.has(game.position)) return false;
+    const anchors = [];
+    const routeIds = [];
+    for (let i = 0; i < game.route.length; i += 1) {
+      const group = game.route[i];
+      if (!Array.isArray(group) || group.length !== G.DOCTORS_PER_CLINIC) return false;
+      if (new Set(group).size !== G.DOCTORS_PER_CLINIC) return false;
+      if (!group.every((id) => Number.isInteger(id) && G.doctorById(id))) return false;
+      anchors.push(group[0]);
+      routeIds.push(...group);
+    }
+    if (new Set(routeIds).size !== G.ROAD_STOPS * G.DOCTORS_PER_CLINIC) return false;
+    if (game.position !== 0 && !anchors.includes(game.position)) return false;
     if (!Number.isFinite(game.minutesLeft) || game.minutesLeft < 0 || game.minutesLeft > G.DAY_MINUTES) return false;
     if (!Array.isArray(game.visited) || !Array.isArray(game.log)) return false;
-    if (!game.visited.every((id) => routeIds.has(id))) return false;
+    if (!game.visited.every((id) => routeIds.includes(id))) return false;
     return true;
   }
 
@@ -117,12 +145,15 @@
       name,
       position: 0,
       route: G.pickRoute(),
+      clinicNames: G.pickClinicNames(),
       minutesLeft: G.DAY_MINUTES,
       score: 0,
       visited: [],
       log: [],
       phase: "map",
       selectedDoctor: null,
+      selectedClinic: null,
+      focusDoctor: null,
       selectedDrug: null,
       pending: null,
       lastResult: null,
@@ -141,25 +172,76 @@
 
   function placeLabel(position) {
     if (position === 0) return "дом";
-    const doctor = G.doctorById(position);
-    return doctor ? doctor.name : "маршрут";
+    return clinicByAnchor(position) ? "поликлиника" : "маршрут";
   }
 
-  function dayDoctors() {
-    return state.route.map((id, index) => ({
-      ...G.doctorById(id),
+  function ensureClinicNames() {
+    const names = state?.clinicNames;
+    const ok = Array.isArray(names)
+      && names.length === G.ROAD_STOPS
+      && new Set(names).size === G.ROAD_STOPS
+      && names.every((name) => G.CLINIC_NAMES.includes(name));
+    if (ok) return false;
+    state.clinicNames = G.pickClinicNames();
+    return true;
+  }
+
+  function dayClinics() {
+    return state.route.map((ids, index) => ({
       slot: index + 1,
+      anchor: ids[0],
+      title: (state.clinicNames && state.clinicNames[index]) || "Поликлиника",
       points: G.pointsForSlot(index + 1),
+      doctors: ids.map((id) => ({
+        ...G.doctorById(id),
+        slot: index + 1,
+        points: G.pointsForSlot(index + 1),
+      })),
     }));
   }
 
+  function clinicByAnchor(anchor) {
+    return dayClinics().find((clinic) => clinic.anchor === anchor) || null;
+  }
+
+  function doctorSeen(id) {
+    return state.visited.includes(id);
+  }
+
+  function doctorsLeft(clinic) {
+    return clinic.doctors.filter((doctor) => !doctorSeen(doctor.id));
+  }
+
+  function clinicDone(clinic) {
+    return doctorsLeft(clinic).length === 0;
+  }
+
+  function clinicEarned(clinic) {
+    return state.log
+      .filter((item) => clinic.doctors.some((doctor) => doctor.id === item.doctorId))
+      .reduce((sum, item) => sum + item.points, 0);
+  }
+
+  function totalDoctorSlots() {
+    return state.route.length * G.DOCTORS_PER_CLINIC;
+  }
+
+  function canStayHere() {
+    const clinic = clinicByAnchor(state.position);
+    return Boolean(clinic && doctorsLeft(clinic).length && state.minutesLeft >= G.VISIT_MINUTES);
+  }
+
   function dayDoctor(id) {
-    return dayDoctors().find((doctor) => doctor.id === id) || null;
+    for (const clinic of dayClinics()) {
+      const found = clinic.doctors.find((doctor) => doctor.id === id);
+      if (found) return found;
+    }
+    return null;
   }
 
   function hasMove() {
-    return dayDoctors().some(
-      (doctor) => !state.visited.includes(doctor.id) && G.visitCost(state.route, state.position, doctor.id) <= state.minutesLeft
+    return dayClinics().some(
+      (clinic) => doctorsLeft(clinic).length > 0 && G.visitCost(state.route, state.position, clinic.anchor) <= state.minutesLeft
     );
   }
 
@@ -172,8 +254,8 @@
 
   function rulesListHtml() {
     return `<ol class="rules">
-      <li><b>1</b><p>День с 09:00 до 17:00. Время уходит на дорогу и на визит.<span>Каждого врача можно посетить один раз.</span></p></li>
-      <li><b>2</b><p>Пять поликлиник стоят вдоль дороги. Над каждой — время пути и баллы.<span>От дома: 20 минут и 20 баллов, 40 минут и 40, час и 60, полтора часа и 80, два часа и 100. Визит — 30 минут. Время считается от вашей текущей точки.</span></p></li>
+      <li><b>1</b><p>День с 09:00 до 17:00. Время уходит на дорогу и на визит.<span>До поездки видны только время пути и баллы. Врача выбираете по приезде. После визита можно зайти к другому врачу здесь или уехать дальше.</span></p></li>
+      <li><b>2</b><p>Пять поликлиник стоят вдоль дороги. В каждой — три врача.<span>От дома: 20 минут и 20 баллов, 40 минут и 40, час и 60, полтора часа и 80, два часа и 100. Каждый визит приносит баллы этой поликлиники. Повторный заход без дороги — ещё 30 минут.</span></p></li>
       <li><b>3</b><p>Препарат по специальности — все баллы уровня.<span>Другая специальность — половина. Нелюбимый препарат — ноль.</span></p></li>
     </ol>`;
   }
@@ -183,38 +265,68 @@
   }
 
   function menuSceneHtml() {
-    return `<svg class="menu-scene" viewBox="0 0 460 200" aria-hidden="true">
+    return `<svg class="menu-scene" viewBox="0 0 1200 680" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
       <defs>
         <radialGradient id="menuSun" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stop-color="#fff6dc"/>
           <stop offset="42%" stop-color="#ffdc7a"/>
           <stop offset="100%" stop-color="#ffdc7a" stop-opacity="0"/>
         </radialGradient>
+        <linearGradient id="menuSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#a9ccec"/>
+          <stop offset="46%" stop-color="#cfe4f2"/>
+          <stop offset="78%" stop-color="#e2eedd"/>
+          <stop offset="100%" stop-color="#e9f2df"/>
+        </linearGradient>
       </defs>
-      <circle cx="86" cy="62" r="40" fill="url(#menuSun)"/>
-      <circle cx="86" cy="62" r="13" fill="#ffdc7a"/>
-      <g fill="#fff">
-        <ellipse cx="196" cy="38" rx="26" ry="11"/>
-        <ellipse cx="182" cy="42" rx="14" ry="9"/>
-        <ellipse cx="214" cy="42" rx="16" ry="10"/>
-        <ellipse cx="330" cy="64" rx="20" ry="8"/>
-        <ellipse cx="318" cy="68" rx="11" ry="7"/>
+      <rect x="0" y="0" width="1200" height="680" fill="url(#menuSky)"/>
+      <circle cx="1030" cy="118" r="96" fill="url(#menuSun)"/>
+      <circle cx="1030" cy="118" r="30" fill="#ffdc7a"/>
+      <g fill="#ffffff" opacity="0.92">
+        <ellipse cx="250" cy="120" rx="52" ry="20"/>
+        <ellipse cx="212" cy="129" rx="29" ry="18"/>
+        <ellipse cx="288" cy="129" rx="33" ry="20"/>
+        <ellipse cx="640" cy="86" rx="40" ry="16"/>
+        <ellipse cx="614" cy="93" rx="23" ry="15"/>
+        <ellipse cx="905" cy="156" rx="32" ry="13"/>
       </g>
-      <path d="M0 118 C90 98 150 132 230 114 C310 96 370 128 460 108 V200 H0 Z" fill="#8aa89a"/>
-      <path d="M0 146 C100 128 170 160 260 142 C340 126 400 158 460 140 V200 H0 Z" fill="#7fb356"/>
-      <path d="M0 172 C110 160 190 186 280 170 C360 156 410 184 460 170 V200 H0 Z" fill="#9dcc72"/>
-      <path d="M-8 164 C100 150 180 178 270 162 C350 148 400 174 468 160" fill="none" stroke="#243042" stroke-width="13" stroke-linecap="round"/>
-      <path d="M-8 164 C100 150 180 178 270 162 C350 148 400 174 468 160" fill="none" stroke="#f3ecdf" stroke-width="1.4" stroke-dasharray="3 9" stroke-linecap="round"/>
-      <path d="M36 156 L54 140 L72 156 Z" fill="#e14b3c"/>
-      <rect x="42" y="156" width="24" height="16" fill="#f4efe4"/>
-      <rect x="50" y="162" width="8" height="10" rx="1" fill="#6b4a34"/>
-      <rect x="292" y="112" width="48" height="8" fill="#0f766e"/>
-      <rect x="292" y="120" width="48" height="46" fill="#f7f4ee"/>
-      <circle cx="316" cy="136" r="7" fill="#fff" stroke="#e23d2f" stroke-width="1.4"/>
-      <path d="M316 132 v8 M312 136 h8" stroke="#e23d2f" stroke-width="1.4" stroke-linecap="round"/>
-      <rect x="304" y="150" width="9" height="10" fill="#c5d7ea"/>
-      <rect x="318" y="150" width="9" height="10" fill="#c5d7ea"/>
+      <path d="M0 496 C180 466 320 518 520 490 C720 462 900 516 1200 480 V680 H0 Z" fill="#8fb0a2"/>
+      <path d="M0 548 C220 520 400 564 600 540 C800 516 980 560 1200 534 V680 H0 Z" fill="#7fb356"/>
+      <path d="M0 584 C240 568 440 598 660 580 C880 562 1040 592 1200 578 V680 H0 Z" fill="#9dcc72"/>
+      <path d="M-20 574 C240 556 440 592 660 572 C880 552 1040 586 1220 568" fill="none" stroke="#243042" stroke-width="26" stroke-linecap="round"/>
+      <path d="M-20 574 C240 556 440 592 660 572 C880 552 1040 586 1220 568" fill="none" stroke="#f3ecdf" stroke-width="2.6" stroke-dasharray="6 18" stroke-linecap="round"/>
+      <g transform="translate(150 526)">
+        <path d="M0 26 L34 0 L68 26 Z" fill="#e14b3c"/>
+        <rect x="10" y="26" width="48" height="30" fill="#f4efe4"/>
+        <rect x="26" y="40" width="16" height="16" rx="1" fill="#6b4a34"/>
+      </g>
+      ${clinicSvg(0, "#0f766e").replace("<svg ", '<svg x="946" y="420" width="116" height="158" ')}
     </svg>`;
+  }
+
+  function openRulesModal() {
+    if (document.getElementById("rules-modal")) return;
+    const el = document.createElement("div");
+    el.className = "menu-modal";
+    el.id = "rules-modal";
+    el.innerHTML = `<div class="menu-modal-card" role="dialog" aria-modal="true" aria-label="Правила">
+      <div class="menu-modal-head">
+        <h2>Правила</h2>
+        <button type="button" class="menu-modal-close" data-action="close-rules" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      ${rulesListHtml()}
+    </div>`;
+    document.getElementById("app").appendChild(el);
+    requestAnimationFrame(() => el.classList.add("is-open"));
+  }
+
+  function closeRulesModal() {
+    const el = document.getElementById("rules-modal");
+    if (!el) return;
+    el.classList.remove("is-open");
+    setTimeout(() => el.remove(), 220);
   }
 
   function showStart() {
@@ -228,15 +340,20 @@
       ? '<button class="btn secondary" type="button" data-action="continue-game">Продолжить день</button>'
       : "";
     app.innerHTML = `<section class="start menu">
-      <header class="menu-hero">
-        <div class="menu-hero-copy">
+      ${menuSceneHtml()}
+      <button type="button" class="menu-roster-btn" data-action="show-roster" aria-label="Справочник" title="Справочник">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/>
+          <circle cx="10" cy="8" r="3.2"/>
+          <path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4"/>
+          <path d="M15.4 5.2a3.2 3.2 0 0 1 0 5.6"/>
+        </svg>
+      </button>
+      <div class="menu-shell">
+        <header class="menu-title">
           <p class="eyebrow">Тренажёр медпредставителя</p>
           <h1>Визитный день</h1>
-          <p class="lead">За 8 часов на дороге 5 врачей из 30, каждый день состав новый. Ближняя поликлиника — 20 минут и 20 баллов, дальняя — 2 часа и 100. Прыжки назад съедают день.</p>
-        </div>
-        ${menuSceneHtml()}
-      </header>
-      <div class="menu-body">
+        </header>
         <div class="menu-card">
           <form id="start-form">
             <label class="field">Как к вам обращаться
@@ -245,19 +362,11 @@
             <p class="error" role="alert"></p>
             <button class="btn" type="submit">Начать день</button>
           </form>
-          <div class="menu-actions">
-            ${continueBtn}
-            <button class="btn secondary" type="button" data-action="show-roster">Все врачи</button>
-          </div>
-          ${save.best ? `<p class="menu-best"><span>Рекорд</span><strong class="num">${esc(G.formatScore(save.best))}</strong></p>` : ""}
+          ${continueBtn}
+          <button class="btn secondary" type="button" data-action="menu-rules">Правила</button>
+          ${save.best ? `<div class="menu-record"><span class="menu-record-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></span><span class="menu-record-label">Рекорд</span><strong class="menu-record-value num">${esc(G.formatScore(save.best))}</strong></div>` : ""}
         </div>
-        <div class="menu-rules">${rulesListHtml()}</div>
       </div>
-      <section class="menu-bag">
-        <p class="block-title">Портфель</p>
-        ${portfolioHtml()}
-        <p class="fine">Препараты вымышленные. Это учебная игра, а не реклама лекарств.</p>
-      </section>
     </section>`;
     renderPanels();
   }
@@ -266,6 +375,7 @@
     stopSkyLoop();
     roadObserver?.disconnect();
     state = null;
+    const places = G.CLINIC_NAMES.map((name) => `<p class="roster-place">${esc(name)}</p>`).join("");
     const cards = G.DOCTORS.map((doctor) => {
       const spec = G.specialtyOf(doctor.specialty);
       const { first, last } = nameParts(doctor.name);
@@ -278,8 +388,11 @@
     setMenuChrome(false);
     document.getElementById("app").innerHTML = `<section class="start roster">
       <p class="eyebrow">Справочник</p>
-      <h1>Все врачи</h1>
-      <p class="lead">Тридцать персонажей. Имя закреплено за портретом. На дороге каждый день случайные 5.</p>
+      <h1>Врачи и поликлиники</h1>
+      <p class="lead">${G.CLINIC_NAMES.length} лечебных учреждений. Каждый день на дорогу попадают пять из них, в каждом три врача.</p>
+      <p class="block-title">Поликлиники</p>
+      <div class="roster-places">${places}</div>
+      <p class="block-title">Врачи</p>
       <div class="roster-grid">${cards}</div>
       <button class="btn" type="button" data-action="new-day">В меню</button>
     </section>`;
@@ -298,7 +411,13 @@
     const save = loadSave();
     if (!save.game) return;
     state = save.game;
-    if (state.phase === "travel") state.phase = "visit";
+    if (ensureClinicNames()) persist();
+    if (state.phase === "travel") {
+      state.phase = "confirm";
+      state.selectedClinic = state.position;
+      state.selectedDoctor = null;
+      state.focusDoctor = null;
+    }
     if (!["map", "confirm", "visit", "result", "help", "finish"].includes(state.phase)) state.phase = "map";
     showGame(false);
   }
@@ -556,7 +675,7 @@
   }
 
   function routeHtml() {
-    const doctors = dayDoctors().slice().reverse().map(stopHtml).join("");
+    const doctors = dayClinics().slice().reverse().map(stopHtml).join("");
     return `${doctors}
       <article class="stop center" data-stop="0" aria-label="Дом">
         <span class="pin" data-pin="0"></span>
@@ -652,10 +771,11 @@
     </svg>`;
   }
 
-  function stopHtml(doctor) {
-    const spec = G.specialtyOf(doctor.specialty);
-    return `<article class="stop at-clinic" data-stop="${doctor.id}">
-      <button type="button" class="clinic-hit" style="--spec:${spec.color}" data-action="select-doctor" data-id="${doctor.id}" aria-label="${esc(doctor.name)}, ${esc(spec.label)}">
+  function stopHtml(clinic) {
+    const names = clinic.doctors.map((doctor) => doctor.name).join(", ");
+    const accent = G.specialtyOf(clinic.doctors[0].specialty).color;
+    return `<article class="stop at-clinic" data-stop="${clinic.anchor}">
+      <button type="button" class="clinic-hit" style="--spec:${accent}" data-action="select-clinic" data-id="${clinic.anchor}" aria-label="${esc(clinic.title)}. Врачи: ${esc(names)}">
         <span class="clinic-banner">
           <span class="banner-time" data-meta="travel" hidden>
             <svg class="banner-time-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 8.2v4.8l2.8 1.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -663,7 +783,7 @@
           </span>
           <span class="banner-split" aria-hidden="true"></span>
           <span class="banner-pts banner-pts-open">
-            <strong class="num" data-meta="pts">${doctor.points}</strong>
+            <strong class="num" data-meta="pts">${clinic.points}</strong>
             <span class="banner-unit" data-meta="unit">баллов</span>
           </span>
           <span class="banner-pts banner-pts-done">
@@ -674,9 +794,9 @@
             </span>
           </span>
         </span>
-        <span class="clinic" aria-hidden="true">${clinicSvg(doctor.slot, spec.color)}</span>
+        <span class="clinic" aria-hidden="true">${clinicSvg(clinic.slot, accent)}</span>
       </button>
-      <span class="pin" data-pin="${doctor.id}"></span>
+      <span class="pin" data-pin="${clinic.anchor}"></span>
     </article>`;
   }
 
@@ -699,57 +819,55 @@
   }
 
   function updateStops() {
-    dayDoctors().forEach((doctor) => {
-      const stop = document.querySelector(`[data-stop="${doctor.id}"]`);
+    dayClinics().forEach((clinic) => {
+      const stop = document.querySelector(`[data-stop="${clinic.anchor}"]`);
       if (!stop) return;
       const here = mapPosition();
-      const visited = state.visited.includes(doctor.id);
-      const travel = G.travelMinutes(state.route, here, doctor.id);
-      const affordable = !visited && travel + G.VISIT_MINUTES <= state.minutesLeft;
-      const entry = state.log.find((item) => item.doctorId === doctor.id);
-      const holdFace = flipHold === doctor.id || (state.phase === "result" && state.lastResult?.doctorId === doctor.id);
-      stop.classList.toggle("is-current", here === doctor.id);
-      stop.classList.toggle("is-visited", visited && !holdFace);
-      stop.classList.toggle("is-locked", !visited && !affordable);
-      stop.classList.toggle("is-selected", state.phase === "confirm" && state.selectedDoctor === doctor.id);
-      stop.dataset.outcome = entry ? entry.outcome : "";
+      const done = clinicDone(clinic);
+      const left = doctorsLeft(clinic);
+      const earned = Math.round(clinicEarned(clinic));
+      const travel = G.travelMinutes(state.route, here, clinic.anchor);
+      const affordable = left.length > 0 && travel + G.VISIT_MINUTES <= state.minutesLeft;
+      const showingResult = state.phase === "result" && clinic.doctors.some((doctor) => doctor.id === state.lastResult?.doctorId);
+      const holdFace = showingResult || flipHold === clinic.anchor;
+      stop.classList.toggle("is-current", here === clinic.anchor);
+      stop.classList.toggle("is-visited", done && !holdFace);
+      stop.classList.toggle("is-locked", !done && !affordable);
+      stop.classList.toggle("is-selected", state.phase === "confirm" && state.selectedClinic === clinic.anchor);
+      const lastEntry = [...state.log].reverse().find((item) => clinic.doctors.some((doctor) => doctor.id === item.doctorId));
+      stop.dataset.outcome = done && lastEntry ? lastEntry.outcome : "";
       const button = stop.querySelector("button");
-      if (button) {
-        button.disabled = visited || !affordable || here === doctor.id;
-        if (visited && entry) {
-          button.setAttribute("aria-label", `${doctor.name}. Визит завершен, ${G.formatScore(entry.points)} баллов.`);
-        } else {
-          button.removeAttribute("aria-label");
-        }
-      }
+      if (button) button.disabled = done || !affordable;
       const sealEl = stop.querySelector("[data-meta='seal']");
       const unitEl = stop.querySelector("[data-meta='seal-unit']");
-      if (sealEl && entry) {
-        const points = Math.round(entry.points);
-        sealEl.textContent = G.formatScore(points);
-        if (unitEl) unitEl.textContent = G.plural(points, "балл", "балла", "баллов");
+      if (sealEl && done) {
+        sealEl.textContent = G.formatScore(earned);
+        if (unitEl) unitEl.textContent = G.plural(earned, "балл", "балла", "баллов");
       }
       const travelEl = stop.querySelector("[data-meta='travel']");
       const ptsEl = stop.querySelector("[data-meta='pts']");
       const unitOpen = stop.querySelector("[data-meta='unit']");
-      const pointsNow = visited && entry ? Math.round(entry.points) : doctor.points;
-      if (unitOpen) unitOpen.textContent = G.plural(doctor.points, "балл", "балла", "баллов");
-      if (visited && entry) {
+      if (unitOpen) unitOpen.textContent = G.plural(clinic.points, "балл", "балла", "баллов");
+      if (done) {
         travelEl.hidden = true;
-        ptsEl.textContent = `+${G.formatScore(entry.points)}`;
-      } else if (here === doctor.id || travel === 0) {
+      } else if (here === clinic.anchor || travel === 0) {
         travelEl.hidden = true;
-        ptsEl.textContent = G.formatScore(doctor.points);
+        ptsEl.textContent = G.formatScore(clinic.points);
       } else {
         travelEl.hidden = false;
         const travelText = travelEl.querySelector(".banner-time-val");
         if (travelText) travelText.textContent = formatTravel(travel);
-        ptsEl.textContent = G.formatScore(doctor.points);
+        ptsEl.textContent = G.formatScore(clinic.points);
       }
+      const names = left.map((doctor) => doctor.name).join(", ");
       const timeBit = travelEl.hidden ? "" : `, дорога ${formatTravel(travel)}`;
-      const scoreBit = visited && entry ? G.formatScore(entry.points) : G.formatScore(pointsNow);
-      if (button && !(visited && entry)) {
-        button.setAttribute("aria-label", `${doctor.name}, ${G.specialtyOf(doctor.specialty).label}${timeBit}, ${scoreBit} баллов.`);
+      if (button) {
+        if (done) {
+          button.setAttribute("aria-label", `${clinic.title}. Закрыта, ${G.formatScore(earned)} баллов.`);
+        } else {
+          const seenBit = earned ? `, уже ${G.formatScore(earned)}` : "";
+          button.setAttribute("aria-label", `${clinic.title}. Можно зайти: ${names}${timeBit}, до ${G.formatScore(clinic.points)} баллов${seenBit}.`);
+        }
       }
     });
     document.querySelector('[data-stop="0"]')?.classList.toggle("is-current", mapPosition() === 0);
@@ -760,7 +878,7 @@
     const card = document.getElementById("day-end");
     const game = document.querySelector(".game");
     if (!card || !game || !state) return;
-    const show = state.screen === "game" && state.phase === "map" && state.visited.length < state.route.length && !hasMove();
+    const show = state.screen === "game" && state.phase === "map" && state.visited.length < totalDoctorSlots() && !hasMove();
     card.hidden = !show;
     game.classList.toggle("has-day-end", show);
     const note = document.getElementById("day-end-note");
@@ -771,13 +889,14 @@
   }
 
   function placeIdForSlot(slot) {
-    if (slot === 0) return 0;
-    return state.route[slot - 1];
+    if (!slot) return 0;
+    const group = state.route[slot - 1];
+    return group ? group[0] : 0;
   }
 
   function parentPlace(placeId) {
-    const slot = state.route.indexOf(placeId) + 1;
-    if (!slot) return null;
+    const slot = G.slotOf(state.route, placeId);
+    if (slot <= 0) return null;
     return placeIdForSlot(G.parentSlot(slot));
   }
 
@@ -830,10 +949,10 @@
     route.style.setProperty("--banner-gap", `${BANNER_GAP}px`);
     route.querySelector(".hill-stack")?.setAttribute("transform", `translate(0 ${hillShiftVb.toFixed(2)})`);
     route.style.width = `${routeW}px`;
-    const bySlot = new Map(dayDoctors().map((doctor) => [doctor.slot, doctor]));
+    const bySlot = new Map(dayClinics().map((clinic) => [clinic.slot, clinic]));
     for (let slot = 1; slot <= G.ROAD_STOPS; slot += 1) {
-      const doctor = bySlot.get(slot);
-      const el = route.querySelector(`[data-stop="${doctor.id}"]`);
+      const clinic = bySlot.get(slot);
+      const el = route.querySelector(`[data-stop="${clinic.anchor}"]`);
       if (!el) continue;
       const pinX = slotPinX(slot);
       const roadY = terrainYpx(pinX, routeW, routeH);
@@ -848,8 +967,8 @@
         pin.style.bottom = "auto";
         pin.style.transform = "translate(-50%, -50%)";
       }
-      const clinic = el.querySelector(".clinic");
-      if (clinic) clinic.style.clipPath = clinicClipPath(pinX, roadY, routeW, routeH);
+      const building = el.querySelector(".clinic");
+      if (building) building.style.clipPath = clinicClipPath(pinX, roadY, routeW, routeH);
     }
     const home = route.querySelector('[data-stop="0"]');
     if (home) {
@@ -865,7 +984,7 @@
   function measurePins() {
     const route = document.getElementById("route");
     const origin = route.getBoundingClientRect();
-    return [0, ...state.route].map((id) => {
+    return [0, ...state.route.map((group) => group[0])].map((id) => {
       const pin = route.querySelector(`[data-pin="${id}"]`);
       const rect = pin.getBoundingClientRect();
       return {
@@ -1073,7 +1192,7 @@
     if (!route || !svg || !scroller || state?.screen !== "game") return;
     const h = Math.round(route.clientHeight);
     if (h < 10 || scroller.clientWidth < 10) return;
-    const stamp = `${scroller.clientWidth}x${h}:${state.route.join(",")}`;
+    const stamp = `${scroller.clientWidth}x${h}:${state.route.flat().join(",")}`;
     if (stamp === roadStamp) return;
     roadStamp = stamp;
     placeStops();
@@ -1293,7 +1412,14 @@
     token.style.left = `${point.x}px`;
     token.style.top = `${point.y}px`;
     if (aim && aim.x * aim.x + aim.y * aim.y > 0.01) {
-      token.style.transform = `rotate(${Math.atan2(aim.y, aim.x) * (180 / Math.PI)}deg)`;
+      let deg = Math.atan2(aim.y, aim.x) * (180 / Math.PI);
+      if (aim.x < 0) {
+        deg += 180;
+        if (deg > 180) deg -= 360;
+        token.style.transform = `rotate(${deg}deg) scaleX(-1)`;
+      } else {
+        token.style.transform = `rotate(${deg}deg)`;
+      }
     }
   }
 
@@ -1350,10 +1476,11 @@
       hops.push({ seg, from: ids[i] });
       total += seg.length;
     }
-    const skyMins = travelMins + G.VISIT_MINUTES;
+    const skyMins = travelMins;
     const travelProgress = (usedBeforeDepart + skyMins) / G.DAY_MINUTES;
     if (!hops.length || motionMs(1) === 0) {
       driving = false;
+      document.getElementById("token")?.classList.remove("is-driving");
       applySkyProgress(travelProgress);
       skyMinutesOverride = usedBeforeDepart + skyMins;
       placeToken(toId);
@@ -1363,6 +1490,7 @@
     }
     const id = ++driveToken;
     driving = true;
+    document.getElementById("token")?.classList.add("is-driving");
     const duration = Math.min(4800, Math.max(1500, total * 2.2));
     startSkyTrip(usedBeforeDepart, skyMins, duration);
     const started = performance.now();
@@ -1386,6 +1514,7 @@
         return;
       }
       driving = false;
+      document.getElementById("token")?.classList.remove("is-driving");
       placeToken(toId);
       done();
     }
@@ -1463,35 +1592,71 @@
   }
 
   function confirmHtml() {
-    const doctor = dayDoctor(state.selectedDoctor);
+    const clinic = clinicByAnchor(state.selectedClinic);
+    if (state.position !== clinic.anchor) return tripHtml(clinic);
+    return arriveHtml(clinic);
+  }
+
+  function tripHtml(clinic) {
+    const travel = G.travelMinutes(state.route, state.position, clinic.anchor);
+    return `<p class="eyebrow">${esc(clinic.title)}</p>
+      <h2>В путь</h2>
+      <ul class="outcomes trip-facts">
+        <li><span>В пути</span><b class="num">${esc(G.formatDuration(travel))}</b></li>
+        <li><span>Баллы за визит</span><b class="num">до ${esc(G.formatScore(clinic.points))}</b></li>
+      </ul>
+      <div class="stack">
+        <button type="button" class="btn" data-action="depart">Поехать · ${esc(G.formatDuration(travel))}</button>
+        <button type="button" class="btn secondary" data-action="cancel">Остаться</button>
+      </div>`;
+  }
+
+  function arriveHtml(clinic) {
+    if (state.selectedDoctor) return doctorCardHtml(clinic, dayDoctor(state.selectedDoctor));
+    const cards = clinic.doctors.map((person) => {
+      const spec = G.specialtyOf(person.specialty);
+      const seen = doctorSeen(person.id);
+      return `<button type="button" class="doctor-choice${seen ? " is-seen" : ""}" style="--spec:${spec.color}" data-action="choose-doctor" data-id="${person.id}" aria-label="${esc(person.name)}, ${esc(spec.label)}"${seen ? " disabled" : ""}>
+        ${window.MPPortrait(person.id)}
+        <span class="spec">${seen ? "Уже были" : esc(spec.label)}</span>
+      </button>`;
+    }).join("");
+    return `<p class="eyebrow">${esc(clinic.title)}</p>
+      <h2>Кого посетить</h2>
+      <p class="clock-note">Визит — 30 минут, без дороги.</p>
+      <div class="doctor-pick">${cards}</div>
+      <button type="button" class="btn secondary" data-action="cancel">Уехать дальше</button>`;
+  }
+
+  function doctorCardHtml(clinic, doctor) {
     const spec = G.specialtyOf(doctor.specialty);
-    const travel = G.travelMinutes(state.route, state.position, doctor.id);
-    const total = travel + G.VISIT_MINUTES;
-    const left = state.minutesLeft - total;
-    const levels = Math.max(0, G.placePath(state.route, state.position, doctor.id).length - 1);
     const dislike = doctor.dislike ? G.drugById(doctor.dislike) : null;
-    return `<div class="person">
+    const { first, last } = nameParts(doctor.name);
+    const total = G.VISIT_MINUTES;
+    const left = state.minutesLeft - total;
+    return `<p class="eyebrow">${esc(clinic.title)}</p>
+      <div class="doctor-card">
         ${window.MPPortrait(doctor.id)}
         <div>
-          <h2>${esc(doctor.name)}</h2>
-          <p class="sub">${esc(spec.label)} · до ${esc(G.formatScore(doctor.points))} баллов</p>
+          <p class="spec" style="--spec:${spec.color}">${esc(spec.label)}</p>
+          <h2><span class="first">${esc(first)}</span><span class="last">${esc(last)}</span></h2>
         </div>
       </div>
-      <p class="clock-note">От точки «${esc(placeLabel(state.position))}»: ${levels} ${G.plural(levels, "участок", "участка", "участков")} · ${esc(G.formatDuration(travel))} в пути и 30 минут визит. Вместе ${esc(G.formatDuration(total))}. После этого на часах ${G.formatClock(minutesUsed() + total)}, останется ${esc(G.formatDuration(left))}.</p>
-      ${dislike ? `<p class="warn">Не назначает <b>${esc(dislike.name)}</b>.</p>` : ""}
+      ${dislike ? `<p class="warn">Не назначает <b>${esc(dislike.name)}</b>.</p>` : `<p class="sub">Назначает любой препарат из портфеля.</p>`}
       <ul class="outcomes">
         <li><span>Препарат по специальности</span><b>${esc(G.formatScore(doctor.points))}</b></li>
         <li><span>Другая специальность</span><b>${esc(G.formatScore(doctor.points / 2))}</b></li>
         <li><span>Нелюбимый препарат</span><b>0</b></li>
       </ul>
+      <p class="clock-note">Визит — 30 минут. После него на часах ${G.formatClock(minutesUsed() + total)}, останется ${esc(G.formatDuration(left))}.</p>
       <div class="stack">
-        <button type="button" class="btn" data-action="depart">Поехать · ${esc(G.formatDuration(total))}</button>
-        <button type="button" class="btn secondary" data-action="cancel">Остаться</button>
+        <button type="button" class="btn" data-action="depart">Зайти · ${esc(G.formatDuration(total))}</button>
+        <button type="button" class="btn secondary" data-action="back-doctors">К выбору врача</button>
       </div>`;
   }
 
   function visitHtml() {
-    const doctor = G.doctorById(state.position);
+    const doctor = dayDoctor(state.focusDoctor);
     const spec = G.specialtyOf(doctor.specialty);
     const dislike = doctor.dislike ? G.drugById(doctor.dislike) : null;
     const drugs = G.DRUGS.map((drug) => {
@@ -1506,7 +1671,7 @@
         <div>
           <p class="eyebrow">Визит</p>
           <h2>${esc(doctor.name)}</h2>
-          <p class="sub">${esc(spec.label)}. Время дороги и визита уже списано. Сейчас ${G.formatClock(minutesUsed())}.</p>
+          <p class="sub">${esc(spec.label)}. ${(state.pending?.travel || 0) > 0 ? "Время дороги и визита уже списано." : "Дорога не нужна: списаны 30 минут визита."} Сейчас ${G.formatClock(minutesUsed())}.</p>
         </div>
       </div>
       ${dislike ? `<p class="warn">Не назначает <b>${esc(dislike.name)}</b>.</p>` : ""}
@@ -1526,7 +1691,14 @@
       half: `${drug.name} — препарат другой специальности. За визит начисляется половина.`,
       dislike: `${doctor.name.split(" ")[0]} не назначает ${drug.name}.`,
     };
-    const nextLabel = state.visited.length === state.route.length ? "К итогам дня" : "Дальше по маршруту";
+    const allDone = state.visited.length >= totalDoctorSlots();
+    const nextLabel = allDone ? "К итогам дня" : "Дальше по маршруту";
+    const actions = !allDone && canStayHere()
+      ? `<div class="stack">
+          <button type="button" class="btn" data-action="stay-clinic">Ещё врач здесь</button>
+          <button type="button" class="btn secondary" data-action="continue-day">Уехать дальше</button>
+        </div>`
+      : `<button type="button" class="btn" data-action="continue-day">${nextLabel}</button>`;
     return `<div class="result-head">
         <div>
           <p class="eyebrow">${esc(drug.name)}</p>
@@ -1537,7 +1709,7 @@
       <p class="result-points ${entry.outcome} num">+${esc(G.formatScore(entry.points))}</p>
       <p class="sub">из ${esc(G.formatScore(entry.maxPoints))} · ${esc(texts[entry.outcome])}</p>
       <p class="clock-note">Счёт ${esc(G.formatScore(state.score))}. На часах ${G.formatClock(minutesUsed())}, ещё ${esc(G.formatDuration(state.minutesLeft))}.</p>
-      <button type="button" class="btn" data-action="continue-day">${nextLabel}</button>`;
+      ${actions}`;
   }
 
   function helpHtml() {
@@ -1552,50 +1724,71 @@
   function finishHtml() {
     return `<p class="eyebrow">До конца дня</p>
       <h2>Завершить день?</h2>
-      <p class="clock-note">Сейчас ${esc(G.formatScore(state.score))} баллов, визитов ${state.visited.length} из ${state.route.length}. Осталось ${esc(G.formatDuration(state.minutesLeft))}.</p>
+      <p class="clock-note">Сейчас ${esc(G.formatScore(state.score))} баллов, визитов ${state.visited.length} из ${totalDoctorSlots()}. Осталось ${esc(G.formatDuration(state.minutesLeft))}.</p>
       <div class="stack">
         <button type="button" class="btn" data-action="finish-day">К итогам</button>
         <button type="button" class="btn secondary" data-action="cancel">Ещё визиты</button>
       </div>`;
   }
 
-  function selectDoctor(id) {
+  function selectClinic(id) {
     if (!state || (state.phase !== "map" && state.phase !== "confirm")) return;
-    const doctorId = Number(id);
-    const doctor = G.doctorById(doctorId);
-    if (!doctor || state.visited.includes(doctorId) || doctorId === state.position) return;
-    if (G.visitCost(state.route, state.position, doctorId) > state.minutesLeft) return;
-    state.selectedDoctor = doctorId;
+    const clinic = clinicByAnchor(Number(id));
+    if (!clinic || clinicDone(clinic)) return;
+    if (G.visitCost(state.route, state.position, clinic.anchor) > state.minutesLeft) return;
+    state.selectedClinic = clinic.anchor;
+    state.selectedDoctor = null;
     state.phase = "confirm";
     updateStops();
     renderOverlay();
+  }
+
+  function chooseDoctor(id) {
+    if (!state || state.phase !== "confirm" || state.position !== state.selectedClinic) return;
+    const clinic = clinicByAnchor(state.selectedClinic);
+    const doctorId = Number(id);
+    if (!clinic || doctorSeen(doctorId) || !clinic.doctors.some((doctor) => doctor.id === doctorId)) return;
+    state.selectedDoctor = doctorId;
+    renderOverlay();
+    updateStops();
+  }
+
+  function backToDoctors() {
+    if (!state || state.phase !== "confirm" || !state.selectedDoctor) return;
+    state.selectedDoctor = null;
+    renderOverlay();
+    updateStops();
   }
 
   function closeSoft() {
     if (!state || !["confirm", "help", "finish"].includes(state.phase)) return;
     state.phase = "map";
     state.selectedDoctor = null;
+    state.selectedClinic = null;
     updateStops();
     renderOverlay();
   }
 
   function depart() {
     if (state.phase !== "confirm") return;
-    const doctor = G.doctorById(state.selectedDoctor);
-    if (!doctor) return;
-    const travel = G.travelMinutes(state.route, state.position, doctor.id);
-    const total = travel + G.VISIT_MINUTES;
-    if (state.minutesLeft < total) return;
+    const clinic = clinicByAnchor(state.selectedClinic);
+    if (!clinic || clinicDone(clinic)) return;
+    if (state.position === clinic.anchor) {
+      enterVisit();
+      return;
+    }
+    const travel = G.travelMinutes(state.route, state.position, clinic.anchor);
+    if (travel + G.VISIT_MINUTES > state.minutesLeft) return;
     const from = state.position;
     const usedBefore = minutesUsed();
-    state.minutesLeft -= total;
+    state.minutesLeft -= travel;
     state.travelSpent += travel;
-    state.visitSpent += G.VISIT_MINUTES;
-    state.pending = { doctorId: doctor.id, travel };
-    state.travelFrom = from;
-    state.position = doctor.id;
-    state.selectedDrug = null;
+    state.pending = { travel };
+    state.focusDoctor = null;
     state.selectedDoctor = null;
+    state.travelFrom = from;
+    state.position = clinic.anchor;
+    state.selectedClinic = clinic.anchor;
     state.phase = "travel";
     skyMinutesOverride = usedBefore;
     persist();
@@ -1603,16 +1796,39 @@
     updateStops();
     renderOverlay();
     layoutRoad();
-    driveCar(from, doctor.id, travel, usedBefore, () => {
+    driveCar(from, clinic.anchor, travel, usedBefore, () => {
       if (!state || state.phase !== "travel") return;
       state.travelFrom = null;
-      state.phase = "visit";
-      skyMinutesOverride = usedBefore + travel + G.VISIT_MINUTES;
+      state.phase = "confirm";
+      state.selectedClinic = clinic.anchor;
+      state.selectedDoctor = null;
+      skyMinutesOverride = null;
       persist();
       updateHud();
       updateStops();
       renderOverlay();
     });
+  }
+
+  function enterVisit() {
+    const clinic = clinicByAnchor(state.selectedClinic);
+    const doctor = dayDoctor(state.selectedDoctor);
+    if (!clinic || state.position !== clinic.anchor || !doctor || doctorSeen(doctor.id)) return;
+    if (state.minutesLeft < G.VISIT_MINUTES) return;
+    const travel = state.pending && state.pending.doctorId == null ? state.pending.travel || 0 : 0;
+    state.minutesLeft -= G.VISIT_MINUTES;
+    state.visitSpent += G.VISIT_MINUTES;
+    state.pending = { doctorId: doctor.id, travel };
+    state.focusDoctor = doctor.id;
+    state.selectedDrug = null;
+    state.selectedDoctor = null;
+    state.selectedClinic = null;
+    state.phase = "visit";
+    skyMinutesOverride = null;
+    persist();
+    updateHud();
+    updateStops();
+    renderOverlay();
   }
 
   function pickDrug(id) {
@@ -1630,7 +1846,7 @@
   function present() {
     if (state.phase !== "visit" || !state.selectedDrug) return;
     skyMinutesOverride = null;
-    const doctor = dayDoctor(state.position);
+    const doctor = dayDoctor(state.focusDoctor);
     const drug = G.drugById(state.selectedDrug);
     const result = G.scoreVisit(doctor, drug.id);
     state.score += result.points;
@@ -1641,7 +1857,7 @@
       points: result.points,
       maxPoints: doctor.points,
       outcome: result.outcome,
-      travel: state.pending?.travel ?? G.travelMinutes(state.route, 0, doctor.id),
+      travel: state.pending?.travel ?? G.travelMinutes(state.route, 0, clinicByAnchor(state.position)?.anchor ?? 0),
     };
     state.log.push(entry);
     state.lastResult = entry;
@@ -1657,18 +1873,35 @@
     if (live) live.textContent = `${doctor.name}: ${result.points} баллов. Счёт ${state.score}.`;
   }
 
-  function continueDay() {
-    if (state.phase !== "result") return;
-    const finished = state.lastResult?.doctorId;
-    const done = state.visited.length === state.route.length;
-    flipHold = finished;
-    state.phase = "map";
+  function stayClinic() {
+    if (state.phase !== "result" || !canStayHere()) return;
+    state.phase = "confirm";
+    state.selectedClinic = state.position;
+    state.selectedDoctor = null;
     state.lastResult = null;
+    state.focusDoctor = null;
     persist();
     renderOverlay();
     updateHud();
     updateStops();
-    flipFinishedCard(finished, done);
+    renderPanels();
+  }
+
+  function continueDay() {
+    if (state.phase !== "result") return;
+    const clinic = clinicByAnchor(state.position);
+    const finishedClinic = clinic && clinicDone(clinic) ? clinic.anchor : null;
+    const allDone = state.visited.length >= totalDoctorSlots();
+    flipHold = finishedClinic;
+    state.phase = "map";
+    state.lastResult = null;
+    state.focusDoctor = null;
+    persist();
+    renderOverlay();
+    updateHud();
+    updateStops();
+    if (finishedClinic != null) flipFinishedCard(finishedClinic, allDone);
+    else if (allDone && state.screen === "game") showSummary();
   }
 
   function flipFinishedCard(id, done) {
@@ -1727,12 +1960,12 @@
     if (state.log.some((item) => item.outcome === "half")) {
       tips.push("Половина баллов — препарат не той специальности. Терапевт — Тералин, гинеколог — Феморин, невролог — Невролекс, хирург — Регенокс.");
     }
-    if (state.visited.length < state.route.length && hasMove()) {
-      tips.push("День закрыт раньше 17:00, на маршруте ещё оставались доступные врачи.");
-    } else if (state.visited.length < state.route.length && state.minutesLeft > 0) {
-      tips.push("Время ещё осталось, но его не хватило на дорогу до оставшихся врачей. Обратный путь до дальней поликлиники — два часа от дома.");
-    } else if (state.visited.length < state.route.length) {
-      tips.push("День закрылся по времени. Пять визитов по порядку занимают 4 часа 30 минут, прыжки назад съедают остаток.");
+    if (state.visited.length < totalDoctorSlots() && hasMove()) {
+      tips.push("День закрыт раньше 17:00, в поликлиниках ещё оставались врачи.");
+    } else if (state.visited.length < totalDoctorSlots() && state.minutesLeft > 0) {
+      tips.push("Время ещё осталось, но его не хватило на следующий визит. Повторный заход в той же поликлинике — 30 минут и без дороги.");
+    } else if (state.visited.length < totalDoctorSlots()) {
+      tips.push("День закрылся по времени. В одной поликлинике можно обойти нескольких врачей подряд: каждый следующий визит — 30 минут.");
     }
     if (state.log.length && state.log.every((item) => item.outcome === "full")) {
       tips.push("Все визиты с полными баллами: препарат совпал со специальностью.");
@@ -1742,7 +1975,9 @@
 
   function summaryHtml() {
     const grade = G.grade(state.score);
-    const missed = dayDoctors().filter((doctor) => !state.visited.includes(doctor.id));
+    const missed = dayClinics()
+      .map((clinic) => ({ ...clinic, left: doctorsLeft(clinic) }))
+      .filter((clinic) => clinic.left.length);
     const tips = coaching();
     return `<section class="summary">
       <p class="eyebrow">${esc(state.name)}</p>
@@ -1751,7 +1986,7 @@
       ${summaryBest ? '<p class="record">Новый личный рекорд</p>' : ""}
       <div class="stats">
         <div class="stat"><b class="num">${esc(G.formatScore(state.score))}</b><span>баллы из ${esc(G.formatScore(G.totalPoints()))}</span></div>
-        <div class="stat"><b class="num">${state.visited.length} / ${state.route.length}</b><span>визитов</span></div>
+        <div class="stat"><b class="num">${state.visited.length} / ${totalDoctorSlots()}</b><span>визитов</span></div>
         <div class="stat"><b class="num">${esc(G.formatDuration(state.travelSpent))}</b><span>в пути</span></div>
         <div class="stat"><b class="num">${esc(G.formatDuration(state.visitSpent))}</b><span>на визитах</span></div>
         <div class="stat"><b class="num">${esc(G.formatDuration(state.minutesLeft))}</b><span>не использовано</span></div>
@@ -1760,7 +1995,7 @@
       ${tips.length ? `<ul class="tips">${tips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul>` : ""}
       <p class="block-title">Журнал</p>
       <div class="log">${state.log.length ? state.log.map(logCard).join("") : "<p class=\"sub\">Визитов не было.</p>"}</div>
-      ${missed.length ? `<p class="fine">Не посетили: ${missed.map((doctor) => esc(doctor.name)).join(", ")}.</p>` : ""}
+      ${missed.length ? `<p class="fine">Не посетили: ${missed.map((clinic) => clinic.left.map((doctor) => esc(doctor.name)).join(", ")).join("; ")}.</p>` : ""}
       <button type="button" class="btn" data-action="new-day">Новый день</button>
     </section>`;
   }
@@ -1793,7 +2028,7 @@
       <h2>Коротко</h2>
       <ol>
         <li>8 часов: с 09:00 до 17:00. Визит — 30 минут.</li>
-          <li>Пять поликлиник. От дома 20, 40, 60, 90 и 120 минут — и 20, 40, 60, 80, 100 баллов.</li>
+          <li>Пять поликлиник, в каждой три врача. До поездки видны время пути и баллы, врача выбираете по приезде. От дома 20, 40, 60, 90 и 120 минут — и 20, 40, 60, 80, 100 баллов за визит.</li>
         <li>Своя специальность — 100% баллов, чужая — 50%, нелюбимый препарат — 0.</li>
       </ol>
       <p class="block-title">Портфель</p>
@@ -1808,11 +2043,14 @@
     const action = button.dataset.action;
     if (action === "continue-game") continueGame();
     else if (action === "show-roster") showRoster();
-    else if (action === "select-doctor") selectDoctor(button.dataset.id);
+    else if (action === "select-clinic") selectClinic(button.dataset.id);
+    else if (action === "choose-doctor") chooseDoctor(button.dataset.id);
+    else if (action === "back-doctors") backToDoctors();
     else if (action === "cancel") closeSoft();
     else if (action === "depart") depart();
     else if (action === "pick-drug") pickDrug(button.dataset.drug);
     else if (action === "present") present();
+    else if (action === "stay-clinic") stayClinic();
     else if (action === "continue-day") continueDay();
     else if (action === "help") {
       if (state?.phase === "map") {
@@ -1824,8 +2062,10 @@
         state.phase = "finish";
         renderOverlay();
       }
-    } else if (action === "finish-day") showSummary();
+    }     else if (action === "finish-day") showSummary();
     else if (action === "new-day") showStart();
+    else if (action === "menu-rules") openRulesModal();
+    else if (action === "close-rules") closeRulesModal();
   }
 
   function onSubmit(event) {
@@ -1844,8 +2084,13 @@
   }
 
   document.getElementById("app").addEventListener("click", (event) => {
+    if (event.target.id === "rules-modal") {
+      closeRulesModal();
+      return;
+    }
     if (event.target.id === "overlay") {
-      closeSoft();
+      if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
+      else closeSoft();
       return;
     }
     onClick(event);
@@ -1853,7 +2098,9 @@
   document.getElementById("app").addEventListener("submit", onSubmit);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      if (document.querySelector(".roster")) showStart();
+      if (document.getElementById("rules-modal")) closeRulesModal();
+      else if (document.querySelector(".roster")) showStart();
+      else if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
       else closeSoft();
     }
   });

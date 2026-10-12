@@ -5,6 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   // Five clinics in one row. Times are the ride from home; edges are the gaps between them.
   const ROAD_STOPS = 5;
+  const DOCTORS_PER_CLINIC = 3;
   const TRUNK_STOPS = 5;
   const VISIT_MINUTES = 30;
   const DAY_MINUTES = 8 * 60;
@@ -74,6 +75,30 @@
     return SPECIALTIES[id];
   }
 
+  const CLINIC_NAMES = [
+    "Городская больница «Это не к нам»",
+    "Больница скорой помощи «Потерпите»",
+    "Консультативный центр «Не наш профиль»",
+    "Диспансер «Пересданный анализ»",
+    "Поликлиника «Врач на больничном»",
+    "Районная поликлиника «Широкий коридор»",
+    "Поликлиника «Танометр врёт»",
+    "Женская консультация «Вам на сколько?»",
+    "Поликлиника «Весёлый главврач»",
+    "Травмпункт «Что ж вы так?»",
+    "Поликлиника «Рецепт на удачу»",
+  ];
+
+  function pickClinicNames(random) {
+    const rng = random || Math.random;
+    const names = CLINIC_NAMES.slice();
+    for (let i = names.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rng() * (i + 1));
+      [names[i], names[j]] = [names[j], names[i]];
+    }
+    return names.slice(0, ROAD_STOPS);
+  }
+
   function pickRoute(random) {
     const rng = random || Math.random;
     const ids = DOCTORS.map((doctor) => doctor.id);
@@ -81,7 +106,12 @@
       const j = Math.floor(rng() * (i + 1));
       [ids[i], ids[j]] = [ids[j], ids[i]];
     }
-    return ids.slice(0, ROAD_STOPS);
+    const clinics = [];
+    for (let slot = 0; slot < ROAD_STOPS; slot += 1) {
+      const start = slot * DOCTORS_PER_CLINIC;
+      clinics.push(ids.slice(start, start + DOCTORS_PER_CLINIC));
+    }
+    return clinics;
   }
 
   function parentSlot(slot) {
@@ -116,7 +146,8 @@
 
   function slotOf(route, placeId) {
     if (placeId === 0) return 0;
-    const index = route.indexOf(placeId);
+    if (!Array.isArray(route)) return -1;
+    const index = route.findIndex((group) => Array.isArray(group) && group[0] === placeId);
     return index === -1 ? -1 : index + 1;
   }
 
@@ -162,7 +193,7 @@
   function placePath(route, fromId, toId) {
     const slots = slotPath(slotOf(route, fromId), slotOf(route, toId));
     if (!slots) return [];
-    return slots.map((slot) => (slot === 0 ? 0 : route[slot - 1]));
+    return slots.map((slot) => (slot === 0 ? 0 : route[slot - 1][0]));
   }
 
   function edgeMinutes(fromSlot, toSlot) {
@@ -223,7 +254,7 @@
   }
 
   function totalPoints() {
-    return routePoints();
+    return routePoints() * DOCTORS_PER_CLINIC;
   }
 
   function grade(score) {
@@ -281,16 +312,30 @@
     if (farthest !== TRUNK_STOPS) errors.push("farthest depth");
     if (branches !== 0) errors.push("branches");
 
-    const route = DOCTORS.slice(0, ROAD_STOPS).map((doctor) => doctor.id);
-    const at = (slot) => route[slot - 1];
+    const route = [];
+    for (let slot = 1; slot <= ROAD_STOPS; slot += 1) {
+      const start = (slot - 1) * DOCTORS_PER_CLINIC;
+      route.push(DOCTORS.slice(start, start + DOCTORS_PER_CLINIC).map((doctor) => doctor.id));
+    }
+    const at = (slot) => route[slot - 1][0];
     if (travelMinutes(route, 0, at(1)) !== 20) errors.push("nearest segment");
     if (travelMinutes(route, at(1), at(2)) !== 20) errors.push("between doctors");
     if (travelMinutes(route, at(3), at(4)) !== 30) errors.push("later segment");
     if (travelMinutes(route, 0, at(TRUNK_STOPS)) !== 120) errors.push("farthest");
     if (placePath(route, 0, at(TRUNK_STOPS)).length !== TRUNK_STOPS + 1) errors.push("trunk path");
 
+    if (CLINIC_NAMES.length < ROAD_STOPS) errors.push("clinic names");
+    if (new Set(CLINIC_NAMES).size !== CLINIC_NAMES.length) errors.push("clinic names unique");
+    const named = pickClinicNames(() => 0);
+    if (named.length !== ROAD_STOPS) errors.push("clinic name count");
+    if (new Set(named).size !== ROAD_STOPS) errors.push("clinic name draw");
+    if (named.some((name) => !CLINIC_NAMES.includes(name))) errors.push("clinic name pool");
+
     const picked = pickRoute(() => 0);
-    if (picked.length !== ROAD_STOPS || new Set(picked).size !== ROAD_STOPS) errors.push("pick route");
+    const pickedIds = picked.flat();
+    if (picked.length !== ROAD_STOPS) errors.push("pick route clinics");
+    if (picked.some((group) => !Array.isArray(group) || group.length !== DOCTORS_PER_CLINIC)) errors.push("pick route size");
+    if (new Set(pickedIds).size !== ROAD_STOPS * DOCTORS_PER_CLINIC) errors.push("pick route unique");
 
     const nearest = { ...doctorById(1), points: pointsForSlot(1) };
     if (scoreVisit(nearest, "teralin").outcome !== "full") errors.push("match");
@@ -319,12 +364,15 @@
     const trunkDay = chained + VISIT_MINUTES * TRUNK_STOPS;
     if (trunkDay > DAY_MINUTES) errors.push("ordered day does not fit");
     if (trunkDay !== 270) errors.push(`ordered day ${trunkDay}`);
+    const everyDoctor = chained + VISIT_MINUTES * ROAD_STOPS * DOCTORS_PER_CLINIC;
+    if (everyDoctor <= DAY_MINUTES) errors.push("every doctor fits");
 
     return errors;
   }
 
   return {
     ROAD_STOPS,
+    DOCTORS_PER_CLINIC,
     TRUNK_STOPS,
     VISIT_MINUTES,
     DAY_MINUTES,
@@ -335,6 +383,8 @@
     doctorById,
     drugById,
     specialtyOf,
+    CLINIC_NAMES,
+    pickClinicNames,
     pickRoute,
     pointsForSlot,
     slotOf,
