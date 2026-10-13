@@ -207,11 +207,16 @@
   const MALE_MARK = /(?<![\p{L}])(думал|зауважал|добрый|отложил|ждал|улыбнулся|готов|заинтересовался|забыл|рад|дослушал|настроен|ожидал|впустил|поверил|поднял|увлекался|слышал|удивился|настроился|повёлся|впечатлён|открыл|вспомнил|решил|клюнул|списал|купился|жил|холоден|сел)(?![\p{L}])/u;
   const FEMALE_MARK = /(?<![\p{L}])(думала|зауважала|добрая|отложила|ждала|улыбнулась|готова|заинтересовалась|забыла|рада|дослушала|настроена|ожидала|впустила|поверила|подняла|увлекалась|слышала|удивилась|настроилась|повелась|впечатлена|открыла|вспомнила|решила|клюнула|списала|купилась|жила|холодна|села|ваша)(?![\p{L}])/u;
 
-  function doctorReaction(hit, female, random) {
+  function doctorReaction(hit, female, random, avoid) {
     const rng = random || Math.random;
     const pool = hit ? WARM_REPLIES : COLD_REPLIES;
-    const line = pool[Math.floor(rng() * pool.length)];
-    return female ? line.f : line.m;
+    const speak = (line) => (female ? line.f : line.m);
+    let choices = pool;
+    if (avoid) {
+      const rest = pool.filter((line) => speak(line) !== avoid);
+      if (rest.length) choices = rest;
+    }
+    return speak(choices[Math.floor(rng() * choices.length)]);
   }
 
   function reactionAgrees(text, female) {
@@ -536,6 +541,8 @@
     if (doctorReaction(true, true, () => 0) !== WARM_REPLIES[0].f) errors.push("warm female");
     if (doctorReaction(false, false, () => 0) !== COLD_REPLIES[0].m) errors.push("cold male");
     if (doctorReaction(false, true, () => 0) !== COLD_REPLIES[0].f) errors.push("cold female");
+    if (doctorReaction(true, false, () => 0, WARM_REPLIES[0].m) !== WARM_REPLIES[1].m) errors.push("warm next");
+    if (doctorReaction(false, true, () => 0, COLD_REPLIES[0].f) !== COLD_REPLIES[1].f) errors.push("cold next");
     if (doctorById(17).female !== true || doctorById(2).female !== false) errors.push("doctor gender");
     const women = DOCTORS.filter((doctor) => doctor.female).length;
     const men = DOCTORS.filter((doctor) => doctor.female === false).length;

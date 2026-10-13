@@ -38,7 +38,7 @@
     const clip = doctorVoiceClips[Math.floor(Math.random() * doctorVoiceClips.length)];
     doctorVoice = clip;
     clip.dataset.hold = "1";
-    clip.volume = 1;
+    applyAudioVolume();
     try {
       if (clip.currentTime > 0 || clip.ended) clip.currentTime = 0;
     } catch (error) {
@@ -47,15 +47,184 @@
     clip.onended = () => {
       clip.dataset.hold = "";
       if (doctorVoice === clip) doctorVoice = null;
+      applyAudioVolume();
     };
     const pending = clip.play();
     if (pending && pending.catch) {
       pending.catch(() => {
         clip.dataset.hold = "";
         if (doctorVoice === clip) doctorVoice = null;
+        applyAudioVolume();
       });
     }
   }
+
+  const TRACKS = ["/audio/track_1.mp3", "/audio/track_2.mp3", "/audio/track_3.mp3", "/audio/track_4.mp3", "/audio/track_5.mp3"];
+  const AUDIO_KEY = "mp-visit-audio";
+  const SOUND_ON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5h3.2L12 6.2v11.6l-4.3-3.3H4.5z"/><path d="M15 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.2 7.2a6.2 6.2 0 0 1 0 9.6"/></svg>`;
+  const SOUND_OFF = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5h3.2L12 6.2v11.6l-4.3-3.3H4.5z"/><path d="M16 10l4 4M20 10l-4 4"/></svg>`;
+  const SOUND_NEXT = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6.5v11L14.5 12z"/><path d="M17.5 6.5v11"/></svg>`;
+  let trackIndex = 0;
+  let musicStarted = false;
+  let soundMuted = false;
+  let musicVolume = 0.5;
+  const music = new Audio();
+  music.preload = "auto";
+  const driveSound = new Audio("/audio/drive.mp3");
+  driveSound.preload = "auto";
+  driveSound.loop = true;
+  let driveFadeFrame = 0;
+
+  function cancelDriveFade() {
+    if (!driveFadeFrame) return;
+    window.cancelAnimationFrame(driveFadeFrame);
+    driveFadeFrame = 0;
+  }
+
+  function loadAudioPrefs() {
+    try {
+      const data = JSON.parse(localStorage.getItem(AUDIO_KEY) || "null");
+      if (!data || typeof data !== "object") return;
+      if (typeof data.muted === "boolean") soundMuted = data.muted;
+    } catch {
+      /* Keep the middle volume. */
+    }
+  }
+
+  function saveAudioPrefs() {
+    try {
+      localStorage.setItem(AUDIO_KEY, JSON.stringify({ muted: soundMuted }));
+    } catch {
+      /* The day still runs without a stored volume. */
+    }
+  }
+
+  function outputVolume() {
+    return soundMuted ? 0 : musicVolume;
+  }
+
+  function applyAudioVolume() {
+    const level = outputVolume();
+    const duck = doctorVoicePlaying() ? 0.35 : driving ? 0.4 : 1;
+    music.volume = level * duck;
+    if (!driveFadeFrame) driveSound.volume = level;
+    doctorVoiceClips.forEach((clip) => {
+      clip.volume = level;
+    });
+  }
+
+  function startDriveSound() {
+    cancelDriveFade();
+    applyAudioVolume();
+    try { driveSound.currentTime = 0; } catch (error) {}
+    if (soundMuted) return;
+    const pending = driveSound.play();
+    if (pending && pending.catch) pending.catch(() => {});
+  }
+
+  function stopDriveSound() {
+    cancelDriveFade();
+    if (driveSound.paused || soundMuted) {
+      driveSound.pause();
+      try { driveSound.currentTime = 0; } catch (error) {}
+      return;
+    }
+    const from = driveSound.volume;
+    const started = performance.now();
+    const duration = 1200;
+    function step(now) {
+      const t = Math.min(1, (now - started) / duration);
+      const fade = 1 - t * t * (3 - 2 * t);
+      driveSound.volume = from * fade;
+      if (t < 1) {
+        driveFadeFrame = window.requestAnimationFrame(step);
+        return;
+      }
+      driveFadeFrame = 0;
+      driveSound.pause();
+      try { driveSound.currentTime = 0; } catch (error) {}
+      applyAudioVolume();
+    }
+    driveFadeFrame = window.requestAnimationFrame(step);
+  }
+
+  function playTrack(index) {
+    trackIndex = (index + TRACKS.length) % TRACKS.length;
+    music.src = TRACKS[trackIndex];
+    applyAudioVolume();
+    if (soundMuted) {
+      music.pause();
+      return;
+    }
+    const pending = music.play();
+    if (pending && pending.catch) pending.catch(() => {});
+  }
+
+  function startMusic() {
+    if (!musicStarted) {
+      musicStarted = true;
+      playTrack(Math.floor(Math.random() * TRACKS.length));
+      return;
+    }
+    if (!soundMuted && music.paused) {
+      const pending = music.play();
+      if (pending && pending.catch) pending.catch(() => {});
+    }
+  }
+
+  function syncSoundbar() {
+    const label = soundMuted ? "Включить звук" : "Выключить звук";
+    document.querySelectorAll(".sound-mute").forEach((button) => {
+      button.setAttribute("aria-pressed", soundMuted ? "true" : "false");
+      button.setAttribute("aria-label", label);
+      button.title = label;
+      button.classList.toggle("is-off", soundMuted);
+      button.innerHTML = soundMuted ? SOUND_OFF : SOUND_ON;
+    });
+  }
+
+  function toggleMute() {
+    soundMuted = !soundMuted;
+    saveAudioPrefs();
+    applyAudioVolume();
+    if (!musicStarted) startMusic();
+    else if (soundMuted) music.pause();
+    else {
+      const pending = music.play();
+      if (pending && pending.catch) pending.catch(() => {});
+    }
+    if (soundMuted) {
+      cancelDriveFade();
+      driveSound.pause();
+    } else if (driving && driveSound.paused) {
+      const pending = driveSound.play();
+      if (pending && pending.catch) pending.catch(() => {});
+    }
+    syncSoundbar();
+  }
+
+  function nextTrack() {
+    if (!musicStarted) {
+      startMusic();
+      return;
+    }
+    playTrack(trackIndex + 1);
+  }
+
+  function soundbarHtml(floating) {
+    const label = soundMuted ? "Включить звук" : "Выключить звук";
+    return `<div class="soundbar${floating ? " is-floating" : ""}">
+      <button type="button" class="icon-btn sound-mute${soundMuted ? " is-off" : ""}" data-action="toggle-mute" aria-pressed="${soundMuted ? "true" : "false"}" aria-label="${label}" title="${label}">${soundMuted ? SOUND_OFF : SOUND_ON}</button>
+      <button type="button" class="icon-btn sound-next" data-action="next-track" aria-label="Следующий трек" title="Следующий трек">${SOUND_NEXT}</button>
+    </div>`;
+  }
+
+  music.addEventListener("ended", () => {
+    playTrack(trackIndex + 1);
+  });
+  loadAudioPrefs();
+  applyAudioVolume();
+
   let interestRevealTimer = 0;
   let roadLiftPx = 0;
   let hillShiftVb = 0;
@@ -461,6 +630,7 @@
   }
 
   function showStart() {
+    startMusic();
     stopSkyLoop();
     roadObserver?.disconnect();
     state = null;
@@ -480,6 +650,7 @@
           <path d="M15.4 5.2a3.2 3.2 0 0 1 0 5.6"/>
         </svg>
       </button>
+      ${soundbarHtml(true)}
       <div class="menu-shell">
         <header class="menu-title">
           <p class="eyebrow">Тренажёр медпредставителя</p>
@@ -519,6 +690,7 @@
     const lines = G.HOBBIES.map((hobby) => `<article class="roster-line"><b>${esc(hobby.label)}</b><span>${esc(hobby.line)}</span></article>`).join("");
     setMenuChrome(false);
     document.getElementById("app").innerHTML = `<section class="start roster">
+      ${soundbarHtml(true)}
       <p class="eyebrow">Справочник</p>
       <h1>Врачи и поликлиники</h1>
       <p class="lead">${G.CLINIC_NAMES.length} лечебных учреждений и ${G.HOBBIES.length} интересов. Каждый день на дорогу попадают пять учреждений, в каждом три врача и три случайных интереса.</p>
@@ -533,6 +705,7 @@
   }
 
   function startGame(name) {
+    startMusic();
     const save = loadSave();
     state = freshState(name);
     save.name = name;
@@ -542,6 +715,7 @@
   }
 
   function continueGame() {
+    startMusic();
     const save = loadSave();
     if (!save.game) return;
     state = save.game;
@@ -593,16 +767,19 @@
         <div class="route" id="route"></div>
       </div>
       <div class="overlay" id="overlay" hidden></div>
-      <aside class="day-end" id="day-end" hidden>
-        <button type="button" class="day-end-card" data-action="finish-day">
-          <span class="day-end-mark" aria-hidden="true"></span>
-          <span class="day-end-copy">
-            <span class="day-end-kicker">Время вышло</span>
-            <strong>Завершить день</strong>
-            <span class="day-end-note" id="day-end-note"></span>
-          </span>
-        </button>
-      </aside>
+      <div class="game-corner">
+        ${soundbarHtml(false)}
+        <aside class="day-end" id="day-end" hidden>
+          <button type="button" class="day-end-card" data-action="finish-day">
+            <span class="day-end-mark" aria-hidden="true"></span>
+            <span class="day-end-copy">
+              <span class="day-end-kicker">Время вышло</span>
+              <strong>Завершить день</strong>
+              <span class="day-end-note" id="day-end-note"></span>
+            </span>
+          </button>
+        </aside>
+      </div>
       <div class="sr" id="live" aria-live="polite"></div>
     </section>`;
     document.getElementById("route").innerHTML =
@@ -1641,6 +1818,7 @@
     const travelProgress = (usedBeforeDepart + skyMins) / G.DAY_MINUTES;
     if (!hops.length || motionMs(1) === 0) {
       driving = false;
+      stopDriveSound();
       document.getElementById("token")?.classList.remove("is-driving");
       applySkyProgress(travelProgress);
       skyMinutesOverride = usedBeforeDepart + skyMins;
@@ -1651,6 +1829,7 @@
     }
     const id = ++driveToken;
     driving = true;
+    startDriveSound();
     document.getElementById("token")?.classList.add("is-driving");
     const duration = Math.min(4800, Math.max(1500, total * 2.2));
     startSkyTrip(usedBeforeDepart, skyMins, duration);
@@ -1675,6 +1854,7 @@
         return;
       }
       driving = false;
+      stopDriveSound();
       document.getElementById("token")?.classList.remove("is-driving");
       placeToken(toId);
       done();
@@ -1735,6 +1915,7 @@
     stage.classList.toggle("is-modal", open || state.phase === "travel");
     stage.classList.toggle("is-busy", state.phase === "travel");
     if (!open) {
+      stopReactionType();
       overlay.hidden = true;
       overlay.innerHTML = "";
       return;
@@ -1747,6 +1928,7 @@
       ? `<div class="sheet contact-sheet" role="dialog" aria-modal="true">${contactDialogHtml()}</div>`
       : "";
     overlay.innerHTML = visitSheet + contactSheet;
+    paintDoctorBubbles();
   }
 
   function sheetHtml() {
@@ -1887,6 +2069,105 @@
     return rapport.reaction;
   }
 
+  let reactionType = null;
+  let typedLine = "";
+
+  function stopReactionType() {
+    if (!reactionType) return;
+    window.clearTimeout(reactionType.timer);
+    reactionType = null;
+  }
+
+  function typeDelay(char) {
+    if (char === " ") return 34;
+    if (char === "," || char === "—" || char === "-") return 80;
+    if (char === "." || char === "!" || char === "?") return 150;
+    return 22;
+  }
+
+  function writeDoctorBubble(node, text, index, typing) {
+    node.replaceChildren(document.createTextNode(text.slice(0, index)));
+    node.classList.toggle("is-typing", typing);
+    if (!typing) return;
+    const caret = document.createElement("span");
+    caret.className = "type-caret";
+    caret.setAttribute("aria-hidden", "true");
+    node.append(caret);
+  }
+
+  function fillDoctorPhrase(text, index, typing) {
+    document.querySelectorAll(".comic-bubble").forEach((node) => {
+      if ((node.dataset.line || "") !== text) return;
+      writeDoctorBubble(node, text, index, typing);
+    });
+  }
+
+  function stepReactionType() {
+    const job = reactionType;
+    if (!job) return;
+    const nodes = [...document.querySelectorAll(".comic-bubble")].filter((node) => node.dataset.line === job.text);
+    if (!nodes.length) {
+      job.timer = window.setTimeout(stepReactionType, 40);
+      return;
+    }
+    const typing = job.index < job.text.length;
+    fillDoctorPhrase(job.text, job.index, typing);
+    if (!typing) {
+      typedLine = job.text;
+      reactionType = null;
+      return;
+    }
+    const shown = job.text[job.index - 1] || "";
+    job.index += 1;
+    job.timer = window.setTimeout(stepReactionType, typeDelay(shown));
+  }
+
+  function startReactionType(text) {
+    stopReactionType();
+    if (!text) return;
+    if (motionMs(1) === 0) {
+      typedLine = text;
+      fillDoctorPhrase(text, text.length, false);
+      return;
+    }
+    reactionType = { text, index: 1, timer: 0 };
+    stepReactionType();
+  }
+
+  function paintDoctorBubbles() {
+    const node = document.querySelector(".comic-bubble[data-line]");
+    if (!node) return;
+    const text = node.dataset.line;
+    if (!text) return;
+    if (reactionType && reactionType.text === text) {
+      fillDoctorPhrase(text, reactionType.index, reactionType.index < text.length);
+      return;
+    }
+    if (motionMs(1) === 0 || typedLine === text) {
+      fillDoctorPhrase(text, text.length, false);
+      return;
+    }
+    startReactionType(text);
+  }
+
+  function cycleDoctorReaction() {
+    const rapport = state?.rapport;
+    if (!rapport || !rapport.pick || rapport.hit == null || !rapport.reaction) return;
+    const doctor = dayDoctor(rapport.doctorId);
+    if (!doctor) return;
+    rapport.reaction = G.doctorReaction(Boolean(rapport.hit), Boolean(doctor.female), Math.random, rapport.reaction);
+    persist();
+    document.querySelectorAll(".comic-bubble").forEach((node) => {
+      node.dataset.line = rapport.reaction;
+      node.setAttribute("aria-label", rapport.reaction);
+    });
+    document.querySelectorAll(".comic-line").forEach((node) => {
+      node.textContent = rapport.reaction;
+    });
+    typedLine = "";
+    startReactionType(rapport.reaction);
+  }
+
   function contactFaceHtml(doctor, bubble) {
     return `<div class="contact-face"><button type="button" class="portrait-voice" data-action="doctor-voice" aria-label="Голос врача">${window.MPPortrait(doctor.id)}</button>${bubble || ""}</div>`;
   }
@@ -1902,7 +2183,7 @@
     const { first, last } = nameParts(doctor.name);
     if (rapport.pick) {
       const hobby = G.hobbyById(rapport.pick);
-      return `${contactFaceHtml(doctor, `<div class="comic-bubble${rapport.hit ? " is-hit" : " is-miss"}" role="status">${esc(rapport.reaction)}</div>`)}
+      return `${contactFaceHtml(doctor, `<div class="comic-bubble${rapport.hit ? " is-hit" : " is-miss"}" role="status" aria-live="off" aria-label="${esc(rapport.reaction)}" data-line="${esc(rapport.reaction)}"></div>`)}
         <p class="contact-name"><span>${esc(first)}</span> <span>${esc(last)}</span></p>
         <p class="player-line">${esc(hobby.line)}</p>
         <button type="button" class="btn" data-action="close-contact">К препарату</button>`;
@@ -2245,9 +2526,12 @@
     });
     const bubble = document.createElement("div");
     bubble.className = `comic-bubble${rapport.hit ? " is-hit" : " is-miss"} is-pop`;
+    bubble.dataset.line = rapport.reaction;
     bubble.setAttribute("role", "status");
-    bubble.textContent = rapport.reaction;
+    bubble.setAttribute("aria-live", "off");
+    bubble.setAttribute("aria-label", rapport.reaction);
     face.appendChild(bubble);
+    startReactionType(rapport.reaction);
     const after = document.createElement("div");
     after.className = "contact-after";
     after.innerHTML = `<p class="player-line">${esc(hobby.line)}</p><button type="button" class="btn" data-action="close-contact">К препарату</button>`;
@@ -2479,6 +2763,7 @@
           <path d="M15.4 5.2a3.2 3.2 0 0 1 0 5.6"/>
         </svg>
       </button>
+      ${soundbarHtml(true)}
       <div class="menu-shell">
         <header class="menu-title">
           <p class="eyebrow">${esc(state.name)}</p>
@@ -2553,7 +2838,10 @@
     else if (action === "learn-interests") learnInterests();
     else if (action === "open-rapport") openRapport();
     else if (action === "pick-reply") pickReply(button.dataset.hobby);
-    else if (action === "doctor-voice") playDoctorVoice();
+    else if (action === "doctor-voice") {
+      playDoctorVoice();
+      cycleDoctorReaction();
+    }
     else if (action === "close-contact") closeContact();
     else if (action === "pick-drug") pickDrug(button.dataset.drug);
     else if (action === "present") present();
@@ -2571,6 +2859,8 @@
       }
     }     else if (action === "finish-day") showSummary();
     else if (action === "new-day") showStart();
+    else if (action === "toggle-mute") toggleMute();
+    else if (action === "next-track") nextTrack();
     else if (action === "menu-rules") openRulesModal();
     else if (action === "close-rules") closeRulesModal();
   }
@@ -2620,5 +2910,7 @@
     placeMap();
   });
 
+  document.addEventListener("pointerdown", () => startMusic(), { capture: true, once: true });
+  document.addEventListener("keydown", () => startMusic(), { capture: true, once: true });
   showStart();
 })();
