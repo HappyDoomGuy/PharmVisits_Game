@@ -8,6 +8,8 @@
   let roadObserver = null;
   let driving = false;
   let mapPinned = false;
+  let mapIntro = null;
+  let mapIntroToken = 0;
   let roadStamp = "";
   let driveToken = 0;
   let pinById = {};
@@ -729,7 +731,7 @@
     showGame(false);
   }
 
-  function showGame() {
+  function showGame(intro) {
     setMenuChrome(false);
     const app = document.getElementById("app");
     app.innerHTML = `<section class="game">
@@ -789,7 +791,10 @@
     renderPanels();
     const scroller = document.getElementById("map-scroll");
     mapPinned = true;
-    const releasePin = () => { mapPinned = false; };
+    const releasePin = () => {
+      mapPinned = false;
+      cancelMapIntro();
+    };
     scroller.addEventListener("pointerdown", releasePin, { once: true });
     scroller.addEventListener("wheel", releasePin, { once: true, passive: true });
     scroller.addEventListener("touchstart", releasePin, { once: true, passive: true });
@@ -801,20 +806,23 @@
     roadStamp = "";
     layoutRoad();
     placeToken(state.position);
-    placeMap();
+    if (intro && motionMs(1) !== 0) beginMapIntro();
+    else placeMap();
     requestAnimationFrame(() => {
       if (state?.screen !== "game" || driving) return;
       layoutRoad();
       placeToken(state.position);
-      placeMap();
+      if (mapIntro) anchorMapIntro();
+      else placeMap();
       watchRoad();
     });
     if (document.fonts?.ready) {
       document.fonts.ready.then(() => {
-        if (state?.screen !== "game") return;
+        if (state?.screen !== "game" || driving) return;
         layoutRoad();
         placeToken(state.position);
-        placeMap();
+        if (mapIntro) anchorMapIntro();
+        else placeMap();
       });
     }
     skyMinutesOverride = null;
@@ -1862,8 +1870,68 @@
     requestAnimationFrame(frame);
   }
 
+  function beginMapIntro() {
+    const scroller = document.getElementById("map-scroll");
+    if (!scroller) {
+      placeMap();
+      return;
+    }
+    mapIntroToken += 1;
+    mapIntro = { id: mapIntroToken, from: 0, started: 0, moving: false, hold: 450, duration: 2600 };
+    anchorMapIntro();
+    requestAnimationFrame(stepMapIntro);
+  }
+
+  function anchorMapIntro() {
+    const job = mapIntro;
+    const scroller = document.getElementById("map-scroll");
+    if (!job || job.moving || !scroller) return;
+    const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+    job.from = max;
+    scroller.scrollLeft = max;
+  }
+
+  function cancelMapIntro() {
+    mapIntroToken += 1;
+    mapIntro = null;
+  }
+
+  function stepMapIntro(now) {
+    const job = mapIntro;
+    if (!job || job.id !== mapIntroToken || state?.screen !== "game") return;
+    const scroller = document.getElementById("map-scroll");
+    if (!scroller) {
+      cancelMapIntro();
+      return;
+    }
+    if (!job.started) job.started = now;
+    const elapsed = now - job.started;
+    if (elapsed < job.hold) {
+      anchorMapIntro();
+      requestAnimationFrame(stepMapIntro);
+      return;
+    }
+    if (!job.moving) {
+      anchorMapIntro();
+      job.moving = true;
+      if (job.from < 24) {
+        cancelMapIntro();
+        placeMap();
+        return;
+      }
+    }
+    const t = Math.min(1, (elapsed - job.hold) / job.duration);
+    scroller.scrollLeft = job.from * (1 - easeInOut(t));
+    if (t < 1) {
+      requestAnimationFrame(stepMapIntro);
+      return;
+    }
+    scroller.scrollLeft = 0;
+    cancelMapIntro();
+  }
+
   function placeMap() {
-    if (!mapPinned || driving || state?.screen !== "game") return;
+    if (mapIntro || !mapPinned || driving || state?.screen !== "game") return;
     const scroller = document.getElementById("map-scroll");
     if (!scroller) return;
     if ((state.position || 0) === 0) {
