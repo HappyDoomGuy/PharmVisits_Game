@@ -230,7 +230,6 @@
   let hillShiftVb = 0;
   let roadSamples = [];
   let cityBlocks = [];
-  let cityScroll = null;
 
   // Clinics stand on the road. A banner above each roof shows the trip and the points.
   const CLINIC_W = 225;
@@ -795,7 +794,10 @@
     scroller.addEventListener("wheel", releasePin, { once: true, passive: true });
     scroller.addEventListener("touchstart", releasePin, { once: true, passive: true });
     scroller.addEventListener("wheel", panOnWheel, { passive: false });
-    scroller.addEventListener("scroll", syncHillParallax, { passive: true });
+    scroller.addEventListener("scroll", () => {
+      syncHillParallax();
+      syncCityParallax();
+    }, { passive: true });
     roadStamp = "";
     layoutRoad();
     placeToken(state.position);
@@ -951,6 +953,14 @@
       cumulusCloud(1145, 26, 0.9, 1.05),
       cumulusCloud(1320, 6, 0.48, 0.42),
     ].join("");
+    const sheet = (depth, pad, pathClass, d) => {
+      const lead = depth < 1;
+      const extra = depth === 1 ? 0 : pad;
+      const vbX = lead ? -extra : 0;
+      const left = lead ? ((-extra / w) * 100).toFixed(4) : "0";
+      const width = (((w + extra) / w) * 100).toFixed(4);
+      return `<svg class="hill-sheet" data-depth="${depth}" style="left:${left}%;width:${width}%" viewBox="${vbX} 0 ${w + extra} 100" preserveAspectRatio="none"><path class="${pathClass}" d="${d}"/></svg>`;
+    };
     return `<div class="scenery" aria-hidden="true">
       <svg class="landscape" viewBox="0 0 ${w} 100" preserveAspectRatio="none">
         <defs>
@@ -974,14 +984,14 @@
             <circle class="sun-core" r="9.2" fill="#ffdc7a"/>
           </g>
         </g>
-        <g class="sky-decor">${clouds}</g>
-        <g class="hill-stack">
-          <g class="hill-layer" data-depth="0.18"><path class="hill-far" d="${far}"/></g>
-          <g class="hill-layer" data-depth="0.42"><path class="hill-mid" d="${mid}"/></g>
-          <g class="hill-layer" data-depth="1"><path class="hill-near" d="${near}"/></g>
-          <g class="hill-layer" data-depth="1.45"><path class="hill-front" d="${front}"/></g>
-        </g>
       </svg>
+      <svg class="landscape sky-clouds" viewBox="0 0 ${w} 100" preserveAspectRatio="none">
+        <g class="sky-decor">${clouds}</g>
+      </svg>
+      ${sheet(0.18, 1100, "hill-far", far)}
+      ${sheet(0.42, 900, "hill-mid", mid)}
+      ${sheet(1, 800, "hill-near", near)}
+      ${sheet(1.45, 700, "hill-front", front)}
     </div>`;
   }
 
@@ -1414,8 +1424,9 @@
     const sy = route.clientHeight / 100;
     if (!sy) return;
     const fix = `scale(1 ${(sx / sy).toFixed(5)})`;
-    route.querySelector(".sky-decor")?.setAttribute("transform", fix);
-    route.querySelector(".sky-sun-rig")?.setAttribute("transform", fix);
+    route.querySelectorAll(".sky-decor, .sky-sun-rig").forEach((el) => {
+      if (el.getAttribute("transform") !== fix) el.setAttribute("transform", fix);
+    });
   }
 
   function applySkyProgress(progress) {
@@ -1424,32 +1435,23 @@
     if (!route) return;
     const p = Math.max(0, Math.min(1, progress));
     const colors = skyColors(p);
-    route.querySelector("#sky-stop-top")?.setAttribute("stop-color", colors.top);
-    route.querySelector("#sky-stop-mid")?.setAttribute("stop-color", colors.mid);
-    route.querySelector("#sky-stop-low")?.setAttribute("stop-color", colors.low);
+    const paint = (el, name, value) => {
+      if (el && el.getAttribute(name) !== value) el.setAttribute(name, value);
+    };
+    paint(route.querySelector("#sky-stop-top"), "stop-color", colors.top);
+    paint(route.querySelector("#sky-stop-mid"), "stop-color", colors.mid);
+    paint(route.querySelector("#sky-stop-low"), "stop-color", colors.low);
     const sun = route.querySelector(".sky-sun");
     if (sun) {
       const point = sunScenePoint(p);
-      sun.setAttribute("transform", `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`);
+      paint(sun, "transform", `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`);
     }
     const warm = Math.max(0, (p - 0.55) / 0.45);
-    route.querySelector("#sun-halo-inner")?.setAttribute(
-      "stop-color",
-      mixHex("#fff8e6", "#ffe0b8", warm)
-    );
-    route.querySelector("#sun-halo-mid")?.setAttribute(
-      "stop-color",
-      mixHex("#ffd066", "#ff9848", warm)
-    );
-    route.querySelector(".sun-core-outer")?.setAttribute(
-      "fill",
-      mixHex("#fff4d6", "#ffd8a8", warm)
-    );
-    route.querySelector(".sun-core")?.setAttribute(
-      "fill",
-      mixHex("#ffdc7a", "#ff9a42", warm)
-    );
-    route.querySelector(".sun-halo")?.setAttribute("opacity", String(0.88 + warm * 0.1));
+    paint(route.querySelector("#sun-halo-inner"), "stop-color", mixHex("#fff8e6", "#ffe0b8", warm));
+    paint(route.querySelector("#sun-halo-mid"), "stop-color", mixHex("#ffd066", "#ff9848", warm));
+    paint(route.querySelector(".sun-core-outer"), "fill", mixHex("#fff4d6", "#ffd8a8", warm));
+    paint(route.querySelector(".sun-core"), "fill", mixHex("#ffdc7a", "#ff9a42", warm));
+    paint(route.querySelector(".sun-halo"), "opacity", String(0.88 + warm * 0.1));
     document.getElementById("map-scroll")?.style.setProperty(
       "background",
       mixHex("#b9e2fb", "#c88868", warm * 0.65)
@@ -1506,6 +1508,7 @@
     applySkyProgress(progress);
     updateCloudMotion(now);
     syncSkyDecorScale();
+    syncHillParallax();
     syncCityParallax();
     skyRafId = requestAnimationFrame(skyFrame);
   }
@@ -1557,6 +1560,7 @@
       <path class="road-mark" d="${d}"></path>`;
     placeSkyline(samples);
     syncSkyDecorScale();
+    syncHillParallax();
   }
 
   function roadCrownAt(samples, x) {
@@ -1677,19 +1681,15 @@
       anchor: Number(el.dataset.x),
       depth: Number(el.parentElement.dataset.depth) || 1,
     }));
-    cityScroll = null;
     syncCityParallax();
   }
 
   function syncCityParallax() {
     const scroller = document.getElementById("map-scroll");
     if (!scroller || !roadSamples.length || !cityBlocks.length) return;
-    const target = scroller.scrollLeft;
-    if (cityScroll == null) cityScroll = target;
-    else cityScroll += (target - cityScroll) * 0.16;
-    if (Math.abs(target - cityScroll) < 0.25) cityScroll = target;
+    const scroll = scroller.scrollLeft;
     cityBlocks.forEach((block) => {
-      const ground = roadCrownAt(roadSamples, block.anchor + cityScroll * (1 - block.depth));
+      const ground = roadCrownAt(roadSamples, block.anchor + scroll * (1 - block.depth));
       block.el.style.transform = `translate3d(${ground.x.toFixed(2)}px, ${ground.y.toFixed(2)}px, 0) translate(-50%, -100%)`;
     });
   }
@@ -1779,11 +1779,11 @@
     const scroller = document.getElementById("map-scroll");
     const route = document.getElementById("route");
     if (!scroller || !route || !route.clientWidth) return;
-    const unit = SCENERY_W / route.clientWidth;
-    route.querySelectorAll(".hill-layer").forEach((layer) => {
+    route.querySelectorAll(".hill-sheet").forEach((layer) => {
       const depth = Number(layer.dataset.depth);
-      const shift = scroller.scrollLeft * (1 - depth) * unit;
-      layer.setAttribute("transform", `translate(${shift.toFixed(2)} 0)`);
+    const shift = scroller.scrollLeft * (1 - depth);
+    const next = `translate3d(${shift.toFixed(2)}px, ${roadLiftPx.toFixed(2)}px, 0)`;
+    if (layer.style.transform !== next) layer.style.transform = next;
     });
   }
 
@@ -2021,7 +2021,7 @@
       : `<button type="button" class="btn scout btn-split" data-action="learn-interests"><span class="btn-title">Узнать интересы</span><span class="btn-time">${scoutTime}</span></button>`;
     const enter = stuck
       ? ""
-      : `<button type="button" class="btn btn-split" data-action="depart"${canEnter ? "" : " disabled"}><span class="btn-title">Зайти</span><span class="btn-time">${visitTime}</span></button>`;
+      : `<button type="button" class="btn btn-split" data-action="depart"${canEnter ? "" : " disabled"}><span class="btn-title">Визит</span><span class="btn-time">${visitTime}</span></button>`;
     const end = stuck ? dayEndCardHtml() : "";
     return `<p class="eyebrow">${esc(clinic.title)}</p>
       <p class="clock-note">${esc(timeNote)}</p>
@@ -2233,7 +2233,7 @@
     };
     let detail = texts[entry.outcome];
     if (entry.rapport === "hit" && entry.drugPoints > 0) detail += " Реплика попала в интересы, баллы удвоены.";
-    else if (entry.rapport === "miss" && entry.drugPoints > 0) detail += " Реплика мимо интересов, баллы срезаны ещё наполовину.";
+    else if (entry.rapport === "miss" && entry.drugPoints > 0) detail += " Реплика мимо интересов, баллы срезаны наполовину.";
     else if (entry.rapport === "hit") detail += " Реплика попала в интересы.";
     else if (entry.rapport === "miss") detail += " Реплика мимо интересов.";
     const cap = entry.rapport ? "" : `из ${G.formatScore(entry.maxPoints)} · `;

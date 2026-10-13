@@ -765,6 +765,7 @@ h1 {
   width: 100%;
   height: 100%;
   display: block;
+  transform: translateZ(0);
 }
 .sky-cloud { opacity: 0.94; }
 .sky-sun { filter: drop-shadow(0 0 4px rgba(255, 210, 90, 0.35)); }
@@ -772,6 +773,14 @@ h1 {
 .hill-mid { fill: #6d9a62; }
 .hill-near { fill: #7fb356; }
 .hill-front { fill: #9dcc72; }
+.hill-sheet {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+  will-change: transform;
+}
+.sky-clouds { z-index: 0; }
 
 .route {
   position: relative;
