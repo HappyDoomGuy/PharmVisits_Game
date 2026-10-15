@@ -185,37 +185,29 @@
   line-height: 1.7;
 }
 
-.claim-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.claim-pick {
+  display: grid;
+  gap: 4px;
   margin: 0 0 8px;
-}
-
-.claim-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 0 10px 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(36, 48, 66, 0.06);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
 }
 
-.claim-chip.is-on {
-  background: #1e2430;
-  color: #fffdf8;
+.claim-select {
+  width: 100%;
+  min-height: 40px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
 }
 
-.claim-chip .claim-count { margin-left: 0; }
-.claim-chip.is-on .claim-count {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fffdf8;
-}
+.claim-select:focus { border-color: var(--ink); outline: none; }
 
 .claim-add {
   height: 32px;

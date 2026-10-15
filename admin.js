@@ -41,12 +41,24 @@
       <path d="M0 584 C240 568 440 598 660 580 C880 562 1040 592 1200 578 V680 H0 Z" fill="#9dcc72"/>
       <path d="M-20 574 C240 556 440 592 660 572 C880 552 1040 586 1220 568" fill="none" stroke="#243042" stroke-width="26" stroke-linecap="round"/>
       <path d="M-20 574 C240 556 440 592 660 572 C880 552 1040 586 1220 568" fill="none" stroke="#f3ecdf" stroke-width="2.6" stroke-dasharray="6 18" stroke-linecap="round"/>
-      <g class="menu-house" transform="translate(150 526)">
-        <g class="menu-home-body">
-          <rect x="-10" y="-10" width="88" height="76" fill="transparent"/>
-          <path d="M0 26 L34 0 L68 26 Z" fill="#e14b3c"/>
-          <rect x="10" y="26" width="48" height="30" fill="#f4efe4"/>
-          <rect x="26" y="40" width="16" height="16" rx="1" fill="#6b4a34"/>
+      <g class="menu-house" transform="translate(184 582)">
+        <g transform="scale(1.22) translate(-32 -74)">
+          <ellipse cx="32" cy="72" rx="26" ry="2.8" fill="#5f8a45" opacity="0.32"/>
+          <rect x="10" y="68" width="44" height="4" fill="#d9cdb8"/>
+          <rect x="14" y="71.2" width="36" height="2" fill="#c9bba4"/>
+          <rect x="12" y="32" width="40" height="37" fill="#fbf6ee"/>
+          <rect x="12" y="32" width="4" height="37" fill="#efe6d8"/>
+          <polygon points="6,34 32,10 58,34" fill="#c4533f"/>
+          <polygon points="6,34 32,10 32,15 11,35" fill="#a84434"/>
+          <rect x="46" y="16" width="6" height="16" fill="#8d5a45"/>
+          <rect x="44" y="14" width="10" height="3" fill="#6e4636"/>
+          <rect x="16" y="40" width="12" height="10" rx="0.5" fill="#f6e3b2" stroke="#9bb0c2" stroke-width="0.7"/>
+          <rect x="36" y="40" width="12" height="10" rx="0.5" fill="#f7fbff" stroke="#9bb0c2" stroke-width="0.7"/>
+          <path d="M22 40 v10 M16 45 h12 M42 40 v10 M36 45 h12" stroke="#d5e2ec" stroke-width="0.6"/>
+          <rect x="27" y="52" width="10" height="18" rx="0.5" fill="#4a4038"/>
+          <rect x="28.2" y="53.2" width="3.4" height="8" fill="#6d5c4e"/>
+          <rect x="32.4" y="53.2" width="3.4" height="8" fill="#5c4d42"/>
+          <circle cx="35" cy="61" r="0.8" fill="#e6d7c4"/>
         </g>
       </g>
       ${clinicMarkup}
@@ -285,9 +297,9 @@
     if (!current.drugs.some((drug) => drug.id === claimDrug)) {
       claimDrug = current.drugs[0] ? current.drugs[0].id : "";
     }
-    const chips = current.drugs.map((drug) => {
-      const on = drug.id === claimDrug;
-      return `<button type="button" class="claim-chip${on ? " is-on" : ""}" data-claim-drug="${esc(drug.id)}" role="tab" aria-selected="${on ? "true" : "false"}">${esc(drug.name)}<b class="claim-count">${filledCount(claims[drug.id])}</b></button>`;
+    const options = current.drugs.map((drug) => {
+      const name = drug.name || "Препарат";
+      return `<option value="${esc(drug.id)}" data-name="${esc(name)}"${drug.id === claimDrug ? " selected" : ""}>${esc(name)} · ${filledCount(claims[drug.id])}</option>`;
     }).join("");
     const panels = current.drugs.map((drug) => {
       const list = Array.isArray(claims[drug.id]) ? claims[drug.id] : [];
@@ -306,7 +318,9 @@
               <h2>Верные</h2>
               <button type="button" class="claim-add" data-add-claim data-correct-add data-list="${esc(claimDrug)}">Добавить</button>
             </div>
-            <div class="claim-chips" role="tablist">${chips}</div>
+            <label class="claim-pick">Препарат
+              <select class="claim-select" data-claim-select aria-label="Препарат">${options}</select>
+            </label>
             <div class="claim-lists">${panels}</div>
           </section>
           <section class="admin-card">
@@ -329,6 +343,9 @@
     form.addEventListener("submit", save);
     form.addEventListener("click", onClaimClick);
     form.addEventListener("input", refreshClaimMeta);
+    form.querySelector("[data-claim-select]")?.addEventListener("change", (event) => {
+      showClaimDrug(event.target.value);
+    });
   }
 
   function claimFields(name, values) {
@@ -347,23 +364,24 @@
     claimDrug = id;
     const add = root.querySelector("[data-correct-add]");
     if (add) add.dataset.list = id;
-    root.querySelectorAll("[data-claim-drug]").forEach((button) => {
-      const on = button.dataset.claimDrug === id;
-      button.classList.toggle("is-on", on);
-      button.setAttribute("aria-selected", on ? "true" : "false");
-    });
+    const select = root.querySelector("[data-claim-select]");
+    if (select && select.value !== id) select.value = id;
     root.querySelectorAll("[data-claim-panel]").forEach((panel) => {
       panel.classList.toggle("is-on", panel.dataset.claimPanel === id);
     });
   }
 
   function refreshClaimMeta() {
-    root.querySelectorAll("[data-claim-drug]").forEach((button) => {
-      const list = root.querySelector(`[data-claim-list="${button.dataset.claimDrug}"]`);
-      const badge = button.querySelector(".claim-count");
-      if (!list || !badge) return;
-      badge.textContent = String([...list.querySelectorAll("input")].filter((field) => field.value.trim()).length);
-    });
+    const select = root.querySelector("[data-claim-select]");
+    if (select) {
+      [...select.options].forEach((option) => {
+        const list = root.querySelector(`[data-claim-list="${option.value}"]`);
+        if (!list) return;
+        const count = [...list.querySelectorAll("input")].filter((field) => field.value.trim()).length;
+        const name = option.dataset.name || "Препарат";
+        option.textContent = `${name} · ${count}`;
+      });
+    }
     const wrong = root.querySelector('[data-claim-list="wrong"]');
     const wrongBadge = root.querySelector("[data-wrong-count]");
     if (wrong && wrongBadge) {
@@ -376,11 +394,6 @@
   }
 
   function onClaimClick(event) {
-    const chip = event.target.closest("[data-claim-drug]");
-    if (chip) {
-      showClaimDrug(chip.dataset.claimDrug);
-      return;
-    }
     const add = event.target.closest("[data-add-claim]");
     if (add) {
       const list = root.querySelector(`[data-claim-list="${add.dataset.list}"]`);
