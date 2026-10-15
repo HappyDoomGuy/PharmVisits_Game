@@ -391,6 +391,7 @@
       selectedClinic: null,
       focusDoctor: null,
       selectedDrug: null,
+      claimQuiz: null,
       pending: null,
       lastResult: null,
       travelSpent: 0,
@@ -616,8 +617,12 @@
       const rows = catalog.specialties
         .map((spec, index) => ({ spec, index, rate: catalog.rates[spec.id][drug.id] }))
         .sort((a, b) => b.rate - a.rate || a.index - b.index);
-      const items = rows.map((row) => `<li class="portfolio-rank ${rateClass(row.rate)}"><span>${esc(row.spec.label)}</span><b>${rateLabel(row.rate)}</b></li>`).join("");
-      return `<section class="portfolio-col"><h3>${esc(drug.name)}</h3><ol>${items}</ol></section>`;
+      const items = rows.map((row) => `<li class="portfolio-rank ${rateClass(row.rate)}"><span>${esc(row.spec.label)}</span><b aria-label="${esc(rateLabel(row.rate))}">${row.rate}%</b></li>`).join("");
+      const claims = G.claimsFor(drug.id);
+      const claimList = claims.length
+        ? `<ul>${claims.map((text) => `<li>${esc(text)}</li>`).join("")}</ul>`
+        : `<p class="is-empty">Верных утверждений пока нет</p>`;
+      return `<section class="portfolio-col"><h3>${esc(drug.name)}</h3><ol>${items}</ol><div class="portfolio-claims"><p>Верные утверждения</p>${claimList}</div></section>`;
     }).join("");
   }
 
@@ -628,14 +633,14 @@
     const el = document.createElement("div");
     el.className = "menu-modal";
     el.id = "portfolio-modal";
-    el.innerHTML = `<div class="menu-modal-card portfolio-card" role="dialog" aria-modal="true" aria-label="Портфель">
+    el.innerHTML = `<div class="menu-modal-card portfolio-card" role="dialog" aria-modal="true" aria-label="Промоплан">
       <div class="menu-modal-head">
-        <h2>Портфель</h2>
+        <h2>Промоплан</h2>
         <button type="button" class="menu-modal-close" data-action="close-portfolio" aria-label="Закрыть">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <p class="portfolio-note">В каждом столбце сверху специальность, которой препарат даёт больше баллов.</p>
+      <p class="portfolio-note">В каждом столбце сверху специальность, которой препарат даёт больше баллов. Ниже — верные утверждения этого препарата.</p>
       <div class="portfolio-board">${portfolioColumnsHtml()}</div>
     </div>`;
     host.appendChild(el);
@@ -664,10 +669,12 @@
 
   function rulesListHtml() {
     return `<ol class="rules">
-      <li><b>1</b><p>День с 09:00 до 17:00. Время уходит на дорогу и на визит.<span>До поездки видны только время пути и баллы. Врача выбираете по приезде. После визита можно зайти к другому врачу здесь или уехать дальше.</span></p></li>
-      <li><b>2</b><p>Пять поликлиник стоят вдоль дороги. В каждой — три врача.<span>От дома: 20 минут и 20 баллов, 40 минут и 40, час и 60, полтора часа и 80, два часа и 100. Каждый визит приносит баллы этой поликлиники. Повторный заход без дороги — ещё 30 минут.</span></p></li>
-      <li><b>3</b><p>Баллы визита зависят от специальности врача и препарата.<span>В таблице: все баллы, половина, четверть или ноль. Если врач не назначает препарат — ноль в любом случае.</span></p></li>
-      <li><b>4</b><p>У каждого врача три интереса, заранее их не видно.<span>«Узнать интересы» стоит 15 минут, после этого они на карточке. Перед препаратом можно «Наладить контакт»: верная реплика удваивает баллы визита, неверная срезает их ещё наполовину.</span></p></li>
+      <li><b>1</b><p>День с 09:00 до 17:00. Время игры уходит на дорогу и на визиты.<span>До входа в ЛПУ видно время пути и баллы, которые может получить игрок (потенциал). Один визит 30 минут, если узнать интересы врача + 15 минут.</span></p></li>
+      <li><b>2</b><p>Пять поликлиник стоят вдоль дороги. В каждой — три врача.<span>Над поликлиникой баллы, которые можно получить за визит к любому из трех врачей поликлиники. Поликлиники рядом с домом игрока дают меньше баллов за визит, но требуют мало времени. Выбирайте стратегию правильно, чтобы в один день сделать больше визитов к врачам с большим потенциалом.</span></p></li>
+      <li><b>3</b><p>Визит к одному врачу, делается только по одному из препаратов, вы выбираете его сами.<span>Количество баллов зависит от специальности врача и препарат, который вы выбрали. Все это определено в промоплане. Например, вы идете к врачу 100 баллов и выбрали препарат «А», он в промоплане дает 50%, значит за просто визит вы получаете 50 баллов.</span></p></li>
+      <li><b>4</b><p>Увеличение/уменьшение числа баллов за визит. У каждого врача три интереса, заранее их не видно.<span>«Узнать интересы» стоит 15 минут, после этого они на карточке. Перед препаратом можно «Наладить контакт»: верная реплика удваивает баллы визита, неверная срезает их ещё наполовину. Например: увлечение «Аквариум» выбрать правильный вопрос «Аквариум дома не бунтует?» — баллы удваиваются. Если не правильный вопрос не связанный с увлечением — баллы уменьшаются вдвое.</span></p></li>
+      <li><b>5</b><p>При нажатии на кнопку «Рассказать о препарате» нужно выбрать одно из правильных утверждений, которые есть в промоплане.<span>Правильный выбор удваивает баллы.</span></p></li>
+      <li class="is-trap"><b>6</b><p>Ловушки игры: при выборе врача вам указываются его предпочтения, например: «Не назначаю препарат „А“». В этом случае, если вы выберете этот препарат для визита, вы всегда получаете ноль баллов, даже если установите контакт и точно скажете ключевое сообщение.</p></li>
     </ol>`;
   }
 
@@ -723,18 +730,28 @@
     const el = document.createElement("div");
     el.className = "menu-modal";
     el.id = "rules-modal";
-    el.innerHTML = `<div class="menu-modal-card" role="dialog" aria-modal="true" aria-label="Правила">
-      <div class="menu-modal-head">
-        <h2>Правила</h2>
-        <button type="button" class="menu-modal-close" data-action="close-rules" aria-label="Закрыть">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
+    el.innerHTML = `<div class="menu-modal-card rules-card" role="dialog" aria-modal="true" aria-label="Правила">
+      <div class="rules-sky">
+        <span class="rules-cloud" aria-hidden="true"></span>
+        <span class="rules-sun" aria-hidden="true"></span>
+        <div class="menu-modal-head">
+          <div>
+            <p class="rules-kicker">Как устроен день</p>
+            <h2>Правила</h2>
+          </div>
+          <button type="button" class="menu-modal-close" data-action="close-rules" aria-label="Закрыть">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
       </div>
-      ${rulesListHtml()}
-      <p class="block-title">Таблица баллов</p>
-      ${portfolioHtml()}
+      <div class="rules-body">
+        ${rulesListHtml()}
+      </div>
     </div>`;
-    document.getElementById("app").appendChild(el);
+    document.body.appendChild(el);
+    el.addEventListener("click", (event) => {
+      if (event.target === el || event.target.closest("[data-action='close-rules']")) closeRulesModal();
+    });
     requestAnimationFrame(() => el.classList.add("is-open"));
   }
 
@@ -756,6 +773,16 @@
   function boardValue(kind, value) {
     if (kind === "days") return `${value} ${G.plural(value, "день", "дня", "дней")}`;
     return G.formatScore(value);
+  }
+
+  function boardMarkIcon(id) {
+    if (id === "days") {
+      return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3.5v3M16 3.5v3M4 10h16"/></svg>`;
+    }
+    if (id === "total") {
+      return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="13" width="4.2" height="7" rx="1.3"/><rect x="9.9" y="8" width="4.2" height="12" rx="1.3"/><rect x="15.8" y="4" width="4.2" height="16" rx="1.3"/></svg>`;
+    }
+    return `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 3h8v1.1c0 2.5-1.6 4.5-4 5.1-2.4-.6-4-2.6-4-5.1V3z"/><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M8 5.1H5.4c.4 1.8 1.5 2.8 2.8 2.7M16 5.1h2.6c-.4 1.8-1.5 2.8-2.8 2.7"/><rect x="11" y="9.6" width="2" height="2.2" rx=".3"/><path d="M8.2 14.4h7.6c.4 0 .7.4.5.8l-.5 1.3H8.2l-.5-1.3c-.2-.4.1-.8.5-.8zM7.2 17.4h9.6v1.6H7.2z"/></svg>`;
   }
 
   function boardCup() {
@@ -802,7 +829,10 @@
     const card = document.querySelector("#board-modal .menu-modal-card");
     if (!card) return;
     const note = BOARD_TABS.find((tab) => tab[0] === boardTab);
-    const tabs = BOARD_TABS.map(([id, label]) => `<button type="button" class="${id === boardTab ? "is-on" : ""}" data-action="board-tab" data-board="${id}" role="tab" aria-selected="${id === boardTab ? "true" : "false"}">${label}</button>`).join("");
+    const tabs = BOARD_TABS.map(([id, label]) => {
+      const text = id === "total" ? "Общий<br>счёт" : label;
+      return `<button type="button" class="${id === boardTab ? "is-on" : ""}" data-action="board-tab" data-board="${id}" role="tab" aria-selected="${id === boardTab ? "true" : "false"}"><span class="board-mark-ico" aria-hidden="true">${boardMarkIcon(id)}</span><span class="board-mark-label">${text}</span></button>`;
+    }).join("");
     card.innerHTML = `<div class="board-sheet">
         <div class="board-sky">
           <span class="board-sun" aria-hidden="true"></span>
@@ -886,7 +916,8 @@
   }
 
   function recordText() {
-    return remoteBest ? G.formatScore(remoteBest) : "—";
+    if (remoteBest == null) return "—";
+    return G.formatScore(remoteBest);
   }
 
   async function loadRemoteBest() {
@@ -939,8 +970,8 @@
       ${soundbarHtml(true)}
       <div class="menu-shell">
         <header class="menu-title">
-          <p class="eyebrow">Тренажёр медпредставителя</p>
-          <h1>Визитный день</h1>
+          <p class="eyebrow">Игровой тренажер<br>медицинского представителя</p>
+          <h1>Визитный<br>день</h1>
         </header>
         <div class="menu-card">
           <form id="start-form">
@@ -948,7 +979,7 @@
               <input id="player-name" name="player" maxlength="24" autocomplete="nickname" placeholder="Имя" value="${esc(save.name)}" />
             </label>
             <p class="error" role="alert"></p>
-            <button class="btn" type="submit">Начать день</button>
+            <button class="btn btn-go" type="submit">Начать день</button>
           </form>
           ${continueBtn}
           <button class="btn secondary" type="button" data-action="menu-rules">Правила</button>
@@ -1011,7 +1042,7 @@
           <span id="hud-left"></span>
         </div>
         <div class="top-links">
-          <button type="button" class="icon-btn" data-action="help" aria-label="Правила" title="Правила">
+          <button type="button" class="icon-btn icon-rules" data-action="help" aria-label="Правила" title="Правила">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M7 4.5h8.2A2.3 2.3 0 0 1 17.5 6.8V19H9.2A2.2 2.2 0 0 0 7 21.2V4.5Z"/>
               <path d="M7 4.5A2.2 2.2 0 0 1 9.2 2.3H17.5"/>
@@ -1035,12 +1066,14 @@
       <div class="overlay" id="overlay" hidden></div>
       <div class="game-corner">
         <button type="button" class="portfolio-btn" data-action="open-portfolio">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M8 8V6.5A2.5 2.5 0 0 1 10.5 4h3A2.5 2.5 0 0 1 16 6.5V8"/>
-            <rect x="4" y="8" width="16" height="12" rx="3"/>
-            <path d="M4 13h16"/>
-          </svg>
-          Портфель
+          <span class="portfolio-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M8 8V6.5A2.5 2.5 0 0 1 10.5 4h3A2.5 2.5 0 0 1 16 6.5V8"/>
+              <rect x="4" y="8" width="16" height="12" rx="3"/>
+              <path d="M4 13h16"/>
+            </svg>
+          </span>
+          ПРОМОПЛАН
         </button>
         <aside class="day-end" id="day-end" hidden>
           <button type="button" class="day-end-card" data-action="finish-day">
@@ -1276,7 +1309,9 @@
   }
 
   function routeHtml() {
-    const doctors = dayClinics().slice().reverse().map(stopHtml).join("");
+    const clinics = dayClinics();
+    const chipColor = clinicAccent(clinics[0]);
+    const doctors = clinics.slice().reverse().map((clinic) => stopHtml(clinic, chipColor)).join("");
     return `${doctors}
       <article class="stop center" data-stop="0" aria-label="Дом">
         <span class="pin" data-pin="0"></span>
@@ -1399,11 +1434,15 @@
     </svg>`;
   }
 
-  function stopHtml(clinic) {
+  function clinicAccent(clinic) {
+    return G.specialtyOf(clinic.doctors[0].specialty).color;
+  }
+
+  function stopHtml(clinic, chipColor) {
     const names = clinic.doctors.map((doctor) => doctor.name).join(", ");
-    const accent = G.specialtyOf(clinic.doctors[0].specialty).color;
+    const accent = clinicAccent(clinic);
     return `<article class="stop at-clinic" data-stop="${clinic.anchor}">
-      <button type="button" class="clinic-hit" style="--spec:${accent}" data-action="select-clinic" data-id="${clinic.anchor}" aria-label="${esc(clinic.title)}. Врачи: ${esc(names)}">
+      <button type="button" class="clinic-hit" style="--spec:${accent};--pts:${chipColor}" data-action="select-clinic" data-id="${clinic.anchor}" aria-label="${esc(clinic.title)}. Врачи: ${esc(names)}">
         <span class="clinic-banner">
           <span class="banner-time" data-meta="travel" hidden>
             <svg class="banner-time-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 8.2v4.8l2.8 1.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -2260,14 +2299,26 @@
       return;
     }
     overlay.hidden = false;
+    if (state.phase !== "visit") {
+      drugPicker = false;
+      claimPicker = false;
+    }
     const contact = contactOpen();
+    if (contact) {
+      drugPicker = false;
+      claimPicker = false;
+    }
     const picking = state.phase === "confirm" && state.position === state.selectedClinic && !state.selectedDoctor;
+    const behind = contact || drugPicker || claimPicker;
     overlay.classList.toggle("has-contact", contact);
-    const visitSheet = `<div class="sheet${picking ? " is-pick" : ""}${contact ? " is-behind" : ""}" role="dialog"${contact ? "" : ' aria-modal="true"'}>${sheetHtml()}</div>`;
+    overlay.classList.toggle("has-drugs", drugPicker || claimPicker);
+    const visitSheet = `<div class="sheet${picking ? " is-pick" : ""}${behind ? " is-behind" : ""}" role="dialog"${behind ? "" : ' aria-modal="true"'}>${sheetHtml()}</div>`;
     const contactSheet = contact
       ? `<div class="sheet contact-sheet" role="dialog" aria-modal="true">${contactDialogHtml()}</div>`
       : "";
-    overlay.innerHTML = visitSheet + contactSheet;
+    const drugSheet = drugPicker ? drugPickerHtml() : "";
+    const claimSheet = claimPicker ? claimPickerHtml() : "";
+    overlay.innerHTML = visitSheet + contactSheet + drugSheet + claimSheet;
     paintDoctorBubbles();
     settleDrugFlow();
   }
@@ -2351,7 +2402,7 @@
           <p class="spec" style="--spec:${spec.color}">${esc(spec.label)}</p>
         </div>
       </div>
-      ${dislike ? `<p class="gold-banner">Не назначает <b>${esc(dislike.name)}</b>.<small>за выбор данного препарата — 0 баллов</small></p>` : `<p class="gold-chip">Назначает любой препарат из портфеля.</p>`}
+      ${dislike ? `<p class="gold-banner">Не назначает <b>${esc(dislike.name)}</b>.<small>за выбор данного препарата — 0 баллов</small></p>` : `<p class="gold-chip">Назначает любой препарат из промоплана.</p>`}
       ${scout}
       <div class="stack">
         ${learn ? `<div class="action-row">${learn}${enter}</div>` : enter}
@@ -2520,14 +2571,50 @@
       <div class="replies">${buttons}</div>`;
   }
 
-  function visitHtml() {
-    const doctor = dayDoctor(state.focusDoctor);
-    const drugs = G.DRUGS.map((drug) => {
+  let drugPicker = false;
+
+  function drugChoicesHtml() {
+    return G.DRUGS.map((drug) => {
       const picked = state.selectedDrug === drug.id;
       return `<button type="button" class="drug${picked ? " is-picked" : ""}" data-action="pick-drug" data-drug="${drug.id}" aria-pressed="${picked ? "true" : "false"}">
         <b>${esc(drug.name)}<span class="drug-lit" aria-hidden="true">${esc(drug.name)}</span></b>
       </button>`;
     }).join("");
+  }
+
+  function drugPickerHtml() {
+    return `<div class="drug-modal" id="drug-modal">
+      <div class="sheet drug-sheet" role="dialog" aria-modal="true" aria-label="Какой препарат выбрать">
+        <div class="menu-modal-head">
+          <h2>Какой препарат выбрать</h2>
+          <button type="button" class="menu-modal-close" data-action="close-drugs" aria-label="Закрыть">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <div class="drugs"><span class="drug-flow" aria-hidden="true"></span>${drugChoicesHtml()}</div>
+      </div>
+    </div>`;
+  }
+
+  function openDrugPicker() {
+    if (state?.phase !== "visit" || contactOpen()) return;
+    claimPicker = false;
+    drugPicker = true;
+    drugCommit = null;
+    renderOverlay();
+  }
+
+  function closeDrugPicker() {
+    if (!drugPicker) return;
+    drugInk.gen += 1;
+    if (drugCommit && state) state.selectedDrug = drugCommit.previous;
+    drugCommit = null;
+    drugPicker = false;
+    renderOverlay();
+  }
+
+  function visitHtml() {
+    const doctor = dayDoctor(state.focusDoctor);
     return `<div class="person">
         ${window.MPPortrait(doctor.id)}
         <div>
@@ -2536,9 +2623,93 @@
         </div>
       </div>
       ${visitContactHtml(doctor)}
-      <p class="block-title">Какой препарат рассказать</p>
-      <div class="drugs"><span class="drug-flow" aria-hidden="true"></span>${drugs}</div>
-      <button type="button" class="btn" data-action="present" ${state.selectedDrug ? "" : "disabled"}>Рассказать о препарате</button>`;
+      <div class="visit-actions">
+        ${chooseDrugButton()}
+        ${tellDrugButton()}
+      </div>`;
+  }
+
+  function selectedVisitDrug() {
+    return state.selectedDrug ? G.drugById(state.selectedDrug) : null;
+  }
+
+  function drugHasClaims(id) {
+    return Boolean(id && G.claimsFor(id).length);
+  }
+
+  function chooseDrugButton() {
+    const drug = selectedVisitDrug();
+    if (!drug) return `<button type="button" class="btn" data-action="open-drugs">Выбрать препарат</button>`;
+    return `<button type="button" class="btn btn-split" data-action="open-drugs">
+        <span class="btn-title">Выбрать препарат</span>
+        <span class="btn-time">Выбран ${esc(drug.name)}</span>
+      </button>`;
+  }
+
+  function tellDrugButton() {
+    const drug = selectedVisitDrug();
+    if (!drug || !drugHasClaims(drug.id)) return "";
+    return `<button type="button" class="btn" data-action="open-claim">Рассказать о препарате</button>`;
+  }
+
+  let claimPicker = false;
+
+  function claimPickerHtml() {
+    const drug = G.drugById(state.selectedDrug);
+    const quiz = state.claimQuiz;
+    const ready = quiz && quiz.drugId === state.selectedDrug && Array.isArray(quiz.options) && quiz.options.length === 4;
+    const body = ready
+      ? `<div class="payoff-pair">
+          <p class="is-up"><b>×2</b><span>если утверждение верное</span></p>
+          <p class="is-same"><b>1×</b><span>неверное, баллы как есть</span></p>
+        </div>
+        <div class="replies">${quiz.options.map((text, index) =>
+          `<button type="button" class="reply" data-action="pick-claim" data-index="${index}">${esc(text)}</button>`
+        ).join("")}</div>`
+      : `<p class="sub">Для «${esc(drug ? drug.name : "препарата")}» пока не из чего собрать вопрос: нужно хотя бы одно верное утверждение и три неверных в общем пуле.</p>
+        <button type="button" class="btn" data-action="skip-claim">Завершить визит</button>`;
+    return `<div class="drug-modal" id="claim-modal">
+      <div class="sheet drug-sheet claim-sheet" role="dialog" aria-modal="true" aria-label="Рассказать о препарате">
+        <div class="menu-modal-head">
+          <h2>Рассказать о препарате</h2>
+          <button type="button" class="menu-modal-close" data-action="close-claim" aria-label="Закрыть">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <p class="sub">${esc(drug ? drug.name : "")}</p>
+        ${body}
+      </div>
+    </div>`;
+  }
+
+  function openClaim() {
+    if (state?.phase !== "visit" || contactOpen() || !drugHasClaims(state.selectedDrug)) return;
+    drugPicker = false;
+    const quiz = state.claimQuiz;
+    const same = quiz && quiz.doctorId === state.focusDoctor && quiz.drugId === state.selectedDrug && !quiz.pick && quiz.hit == null;
+    if (!same) {
+      const round = G.claimRound(state.selectedDrug);
+      state.claimQuiz = round
+        ? { doctorId: state.focusDoctor, drugId: state.selectedDrug, options: round.options, correct: round.correct }
+        : { doctorId: state.focusDoctor, drugId: state.selectedDrug, options: null, correct: null };
+      persist();
+    }
+    claimPicker = true;
+    renderOverlay();
+  }
+
+  function closeClaim() {
+    if (!claimPicker) return;
+    claimPicker = false;
+    renderOverlay();
+  }
+
+  function factorSentence(kind, base, hitScore, missScore, hitZero, missZero) {
+    if (kind !== "hit" && kind !== "miss") return "";
+    const text = base > 0
+      ? (kind === "hit" ? hitScore : missScore)
+      : (kind === "hit" ? hitZero : missZero);
+    return ` ${text.replace(/^\s+/, "")}`;
   }
 
   function resultHtml() {
@@ -2569,11 +2740,17 @@
       dislike: `${doctor.name.split(" ")[0]} не назначает ${drug.name}.`,
     };
     let detail = texts[entry.outcome];
-    if (entry.rapport === "hit" && entry.drugPoints > 0) detail += " Реплика попала в интересы, баллы удвоены.";
-    else if (entry.rapport === "miss" && entry.drugPoints > 0) detail += " Реплика мимо интересов, баллы срезаны наполовину.";
-    else if (entry.rapport === "hit") detail += " Реплика попала в интересы.";
-    else if (entry.rapport === "miss") detail += " Реплика мимо интересов.";
-    const cap = entry.rapport ? "" : `из ${G.formatScore(entry.maxPoints)} · `;
+    detail += factorSentence(entry.rapport, entry.drugPoints, "Реплика попала в интересы, баллы удвоены.", "Реплика мимо интересов, баллы срезаны наполовину.", "Реплика попала в интересы.", "Реплика мимо интересов.");
+    detail += factorSentence(entry.claim, entry.drugPoints, "Утверждение верное, баллы удвоены.", "Утверждение неверное, баллы без бонуса.", "Утверждение верное, на ноль это не влияет.", "Утверждение неверное, на ноль это не влияет.");
+    if (entry.drugPoints > 0 && (entry.rapport || entry.claim === "hit")) {
+      const bits = [`за препарат ${G.formatScore(entry.drugPoints)}`];
+      if (entry.rapport === "hit") bits.push("интересы ×2");
+      else if (entry.rapport === "miss") bits.push("интересы ÷2");
+      if (entry.claim === "hit") bits.push("утверждение ×2");
+      detail = `${bits.join(" · ")}. ${detail}`;
+    }
+    const scaled = entry.rapport || entry.claim === "hit";
+    const cap = scaled ? "" : `из ${G.formatScore(entry.maxPoints)} · `;
     const allDone = state.visited.length >= totalDoctorSlots();
     const nextLabel = allDone ? "К итогам дня" : "Дальше по маршруту";
     const actions = allDone
@@ -2603,8 +2780,6 @@
     return `<p class="eyebrow">Как устроен день</p>
       <h2>Правила</h2>
       ${rulesListHtml()}
-      <p class="block-title">Таблица баллов</p>
-      ${portfolioHtml()}
       <button type="button" class="btn" data-action="cancel">К маршруту</button>`;
   }
 
@@ -2708,6 +2883,10 @@
     state.pending = { doctorId: doctor.id, travel };
     state.focusDoctor = doctor.id;
     state.selectedDrug = null;
+    state.claimQuiz = null;
+    drugPicker = false;
+    claimPicker = false;
+    drugCommit = null;
     state.rapport = null;
     state.selectedDoctor = null;
     state.selectedClinic = null;
@@ -2720,6 +2899,7 @@
   }
 
   let drugInk = { gen: 0 };
+  let drugCommit = null;
 
   function drugBox(button) {
     return {
@@ -2824,10 +3004,14 @@
     finishDrugLit(grid, next);
   }
 
-  function flowToDrug(grid, next) {
+  function flowToDrug(grid, next, onDone) {
     const flow = grid.querySelector(".drug-flow");
+    const finish = () => {
+      if (onDone) onDone();
+    };
     if (!flow) {
       next.classList.add("is-picked");
+      finish();
       return;
     }
     const target = drugBox(next);
@@ -2841,6 +3025,7 @@
       applyDrugBox(flow, target);
       flow.classList.add("is-on");
       finishDrugLit(grid, next);
+      finish();
       return;
     }
 
@@ -2870,21 +3055,49 @@
       applyDrugBox(flow, target);
       anim.cancel();
       finishDrugLit(grid, next);
+      finish();
     };
   }
 
   function pickDrug(id) {
-    if (state.phase !== "visit" || !G.drugById(id) || state.selectedDrug === id) return;
-    const grid = document.querySelector(".overlay .drugs");
+    if (state.phase !== "visit" || !drugPicker || !G.drugById(id)) return;
+    if (state.selectedDrug === id) {
+      if (!drugHasClaims(id)) {
+        drugPicker = false;
+        present();
+      }
+      return;
+    }
+    const grid = document.querySelector("#drug-modal .drugs");
     const next = grid && grid.querySelector(`[data-drug="${CSS.escape(id)}"]`);
     if (!next) return;
+    drugCommit = { id, previous: state.selectedDrug };
     state.selectedDrug = id;
     grid.querySelectorAll("[data-drug]").forEach((button) => {
       button.setAttribute("aria-pressed", button === next ? "true" : "false");
     });
-    const present = document.querySelector("[data-action='present']");
-    if (present) present.disabled = false;
-    flowToDrug(grid, next);
+    flowToDrug(grid, next, () => {
+      if (!drugPicker || !drugCommit || drugCommit.id !== id || state?.phase !== "visit" || state.selectedDrug !== id) return;
+      drugCommit = null;
+      drugPicker = false;
+      state.claimQuiz = null;
+      if (!drugHasClaims(id)) {
+        present();
+        return;
+      }
+      persist();
+      renderOverlay();
+    });
+  }
+
+  function pickClaim(index) {
+    const quiz = state.claimQuiz;
+    const choice = Number(index);
+    if (state.phase !== "visit" || !claimPicker || !quiz || !Array.isArray(quiz.options) || !quiz.options[choice]) return;
+    if (quiz.drugId !== state.selectedDrug) return;
+    state.claimQuiz = { ...quiz, pick: choice, hit: choice === quiz.correct };
+    claimPicker = false;
+    present();
   }
 
   function learnInterests() {
@@ -3072,6 +3285,8 @@
 
   function present() {
     if (state.phase !== "visit" || !state.selectedDrug) return;
+    drugPicker = false;
+    claimPicker = false;
     skyMinutesOverride = null;
     const doctor = dayDoctor(state.focusDoctor);
     const drug = G.drugById(state.selectedDrug);
@@ -3079,7 +3294,11 @@
     const rapport = state.rapport && state.rapport.doctorId === doctor.id && state.rapport.pick
       ? (interestsOf(doctor.id).includes(state.rapport.pick) ? "hit" : "miss")
       : null;
-    const points = G.applyRapport(result.points, rapport);
+    const quiz = state.claimQuiz;
+    const claim = quiz && quiz.drugId === drug.id && quiz.hit != null
+      ? (quiz.hit ? "hit" : "miss")
+      : null;
+    const points = G.finishVisit(result.points, rapport, claim);
     state.score += points;
     if (!state.visited.includes(doctor.id)) state.visited.push(doctor.id);
     const entry = {
@@ -3091,12 +3310,14 @@
       maxPoints: doctor.points,
       outcome: result.outcome,
       rapport,
+      claim,
       travel: state.pending?.travel ?? G.travelMinutes(state.route, 0, clinicByAnchor(state.position)?.anchor ?? 0),
     };
     state.log.push(entry);
     state.lastResult = entry;
     state.pending = null;
     state.selectedDrug = null;
+    state.claimQuiz = null;
     state.rapport = null;
     state.phase = "result";
     persist();
@@ -3209,6 +3430,9 @@
     if (state.log.some((item) => item.rapport === "miss")) {
       tips.push("Реплика мимо интересов срезает баллы ещё наполовину. Интересы можно узнать за 15 минут до визита.");
     }
+    if (state.log.some((item) => item.claim === "miss" && item.drugPoints > 0)) {
+      tips.push("Верное утверждение удваивает баллы визита. Неверное оставляет их как есть, без бонуса.");
+    }
     if (state.log.some((item) => item.outcome === "half" || item.outcome === "quarter" || item.outcome === "none")) {
       tips.push("Часть баллов срезана таблицей: для этой специальности препарат даёт не все баллы.");
     }
@@ -3275,9 +3499,10 @@
     const drug = G.drugById(entry.drugId);
     const spec = G.specialtyOf(entry.specialty || doctor.specialty) || { label: "" };
     const rapportBit = entry.rapport === "hit" ? " · контакт ×2" : entry.rapport === "miss" ? " · контакт мимо" : "";
+    const claimBit = entry.claim === "hit" ? " · утверждение ×2" : entry.claim === "miss" ? " · утверждение без бонуса" : "";
     return `<article>
       <b>${esc(doctor.name)}</b>
-      <span>${esc(spec.label)} · ${esc(drug.name)} · дорога ${entry.travel} мин${esc(rapportBit)}</span>
+      <span>${esc(spec.label)} · ${esc(drug.name)} · дорога ${entry.travel} мин${esc(rapportBit + claimBit)}</span>
       <strong class="${entry.outcome} num">+${esc(G.formatScore(entry.points))}</strong>
     </article>`;
   }
@@ -3300,7 +3525,7 @@
       <ol>
         <li>8 часов: с 09:00 до 17:00. Визит — 30 минут.</li>
           <li>Пять поликлиник, в каждой три врача. До поездки видны время пути и баллы, врача выбираете по приезде. От дома 20, 40, 60, 90 и 120 минут — и 20, 40, 60, 80, 100 баллов за визит.</li>
-        <li>Баллы визита — по таблице специальности и препарата: все, половина, четверть или ноль. Не назначает — всегда ноль.</li>
+        <li>Баллы визита — по таблице специальности и препарата: все, половина, четверть или ноль. Не назначает — всегда ноль. Верное утверждение удваивает эти баллы, неверное оставляет их как есть.</li>
         <li>Интересы врача скрыты. Узнать их — 15 минут, и только если после этого останется время на визит. Верная реплика удваивает баллы, неверная срезает ещё наполовину.</li>
       </ol>
       <p class="block-title">Таблица баллов</p>
@@ -3322,7 +3547,7 @@
       clearTimeout(menuHomeTapTimer);
       menuHomeTapTimer = setTimeout(() => button.classList.remove("is-tap"), 920);
       menuHomeTaps += 1;
-      if (menuHomeTaps >= 10) window.location.assign("/admin");
+      if (menuHomeTaps >= 5) window.location.assign("/admin");
     }
     else if (action === "continue-game") continueGame();
     else if (action === "select-clinic") selectClinic(button.dataset.id);
@@ -3338,21 +3563,27 @@
       cycleDoctorReaction();
     }
     else if (action === "close-contact") closeContact();
+    else if (action === "open-drugs") openDrugPicker();
+    else if (action === "close-drugs") closeDrugPicker();
     else if (action === "pick-drug") pickDrug(button.dataset.drug);
+    else if (action === "open-claim") openClaim();
+    else if (action === "close-claim") closeClaim();
+    else if (action === "pick-claim") pickClaim(button.dataset.index);
+    else if (action === "skip-claim") {
+      claimPicker = false;
+      present();
+    }
     else if (action === "present") present();
     else if (action === "stay-clinic") stayClinic();
     else if (action === "continue-day") continueDay();
-    else if (action === "help") {
-      if (state?.phase === "map") {
-        state.phase = "help";
-        renderOverlay();
-      }
-    } else if (action === "ask-finish") {
+    else if (action === "help") openRulesModal();
+    else if (action === "ask-finish") {
       if (state?.phase === "map") {
         state.phase = "finish";
         renderOverlay();
       }
-    }     else if (action === "finish-day") showSummary();
+    }
+    else if (action === "finish-day") showSummary();
     else if (action === "new-day") showStart();
     else if (action === "toggle-mute") toggleMute();
     else if (action === "next-track") nextTrack();
@@ -3397,8 +3628,18 @@
       closeBoard();
       return;
     }
+    if (event.target.id === "drug-modal") {
+      closeDrugPicker();
+      return;
+    }
+    if (event.target.id === "claim-modal") {
+      closeClaim();
+      return;
+    }
     if (event.target.id === "overlay") {
-      if (contactOpen()) closeContact();
+      if (claimPicker) closeClaim();
+      else if (drugPicker) closeDrugPicker();
+      else if (contactOpen()) closeContact();
       else if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
       else closeSoft();
       return;
@@ -3411,6 +3652,8 @@
       if (document.getElementById("portfolio-modal")) closePortfolio();
       else if (document.getElementById("rules-modal")) closeRulesModal();
       else if (document.getElementById("board-modal")) closeBoard();
+      else if (document.getElementById("claim-modal")) closeClaim();
+      else if (document.getElementById("drug-modal")) closeDrugPicker();
       else if (contactOpen()) closeContact();
       else if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
       else closeSoft();
@@ -3435,9 +3678,27 @@
       })
       .catch(() => {});
   }
-  Promise.race([
-    loadCatalog(),
-    new Promise((resolve) => { window.setTimeout(resolve, 4000); }),
+  function whenTitleFont() {
+    if (!document.fonts?.load) return Promise.resolve();
+    const loaded = document.fonts.load("600 58px Unbounded", "Визитный день 0123456789 —").catch(() => {});
+    return Promise.race([
+      loaded,
+      new Promise((resolve) => { window.setTimeout(resolve, 800); }),
+    ]);
+  }
+  function whenRecord() {
+    return Promise.race([
+      loadRemoteBest(),
+      new Promise((resolve) => { window.setTimeout(resolve, 800); }),
+    ]);
+  }
+  Promise.all([
+    Promise.race([
+      loadCatalog(),
+      new Promise((resolve) => { window.setTimeout(resolve, 4000); }),
+    ]),
+    whenTitleFont(),
+    whenRecord(),
   ]).then(() => {
     acceptCatalog = false;
     showStart();

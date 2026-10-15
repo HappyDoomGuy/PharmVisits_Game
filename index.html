@@ -9,16 +9,18 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%231e2430' rx='8' width='32' height='32'/%3E%3Cpath d='M8 22 V12 h4 v10 M14 22 V8 h4 v14 M20 22 v-6 h4 v6' fill='none' stroke='%23f6f1e7' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=board-load" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="preload" href="fonts/unbounded-600-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/unbounded-600-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="styles.css?v=hud-round" />
   </head>
   <body>
     <div class="shell">
       <main class="stage" id="app"></main>
       <aside class="panel" id="side-right"></aside>
     </div>
-    <script src="game.js?v=medical-names"></script>
+    <script src="game.js?v=claim-miss"></script>
     <script src="portraits.js"></script>
-    <script src="app.js?v=board-load"></script>
+    <script src="app.js?v=hud-round"></script>
   </body>
 </html>

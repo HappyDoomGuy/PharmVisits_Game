@@ -177,6 +177,23 @@
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, 40);
   }
 
+  function cleanClaim(value) {
+    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 240);
+  }
+
+  function uniqueClaims(list) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    const claims = [];
+    list.forEach((item) => {
+      const text = cleanClaim(typeof item === "string" ? item : item && item.text);
+      if (!text || seen.has(text)) return;
+      seen.add(text);
+      claims.push(text);
+    });
+    return claims;
+  }
+
   function specialtyMark(label, index) {
     const letter = cleanLabel(label).charAt(0).toUpperCase();
     return letter || String(index + 1);
@@ -201,6 +218,8 @@
       })),
       drugs: DRUG_IDS.map((id, index) => ({ id, name: drugNames[index] })),
       rates,
+      claims: Object.fromEntries(DRUG_IDS.map((id) => [id, []])),
+      wrongClaims: [],
     };
   }
 
@@ -243,7 +262,17 @@
         rates[specId][drugId] = rate;
       }
     }
-    return { specialties, drugs, rates };
+    const claims = {};
+    DRUG_IDS.forEach((drugId) => {
+      const row = Array.isArray(input.drugs)
+        ? input.drugs.find((item) => item && item.id === drugId)
+        : null;
+      const raw = input.claims && Object.prototype.hasOwnProperty.call(input.claims, drugId)
+        ? input.claims[drugId]
+        : row && row.claims;
+      claims[drugId] = uniqueClaims(raw);
+    });
+    return { specialties, drugs, rates, claims, wrongClaims: uniqueClaims(input.wrongClaims) };
   }
 
   function installCatalog(next) {
@@ -376,6 +405,36 @@
     if (rapport === "hit") return points * 2;
     if (rapport === "miss") return points / 2;
     return points;
+  }
+
+  function claimsFor(drugId) {
+    return uniqueClaims(catalog && catalog.claims && catalog.claims[drugId]);
+  }
+
+  function wrongClaimPool() {
+    return uniqueClaims(catalog && catalog.wrongClaims);
+  }
+
+  function claimRound(drugId, random) {
+    const correct = claimsFor(drugId);
+    const wrong = wrongClaimPool();
+    if (!correct.length || wrong.length < 3) return null;
+    const rng = random || Math.random;
+    const hit = correct[Math.floor(rng() * correct.length)];
+    const decoys = shuffle(wrong.filter((text) => text !== hit), rng).slice(0, 3);
+    if (decoys.length < 3) return null;
+    const options = shuffle([hit].concat(decoys), rng);
+    return { options, correct: options.indexOf(hit) };
+  }
+
+  function finishVisit(drugPoints, rapport, claim) {
+    const base = Number(drugPoints);
+    if (!Number.isFinite(base) || base <= 0) return 0;
+    let value = base;
+    if (rapport === "hit") value *= 2;
+    else if (rapport === "miss") value /= 2;
+    if (claim === "hit") value *= 2;
+    return Math.round(value);
   }
 
   const WARM_REPLIES = [
@@ -863,6 +922,38 @@
     if (applyRapport(50, "miss") !== 25) errors.push("rapport miss again");
     if (applyRapport(0, "hit") !== 0 || applyRapport(0, "miss") !== 0) errors.push("rapport zero");
     if (applyRapport(100, null) !== 100) errors.push("rapport skip");
+    const claimed = defaultCatalog();
+    claimed.claims.teralin = ["Верно про Тералин", "Ещё одно верное", "Верно про Тералин"];
+    claimed.wrongClaims = ["Мимо один", "Мимо два", "Мимо три", "Мимо четыре", "  ", "Мимо два"];
+    const storedClaims = normalizeCatalog(claimed);
+    if (!storedClaims || storedClaims.claims.teralin.length !== 2) errors.push("claim unique");
+    if (!storedClaims || storedClaims.wrongClaims.length !== 4) errors.push("wrong unique");
+    const legacy = defaultCatalog();
+    delete legacy.claims;
+    delete legacy.wrongClaims;
+    const legacyStored = normalizeCatalog(legacy);
+    if (!legacyStored || legacyStored.claims.femorin.length !== 0 || legacyStored.wrongClaims.length !== 0) {
+      errors.push("legacy claims");
+    }
+    if (!applyCatalog(claimed)) errors.push("claims catalog");
+    const round = claimRound("teralin", () => 0);
+    if (!round || round.options.length !== 4 || new Set(round.options).size !== 4) errors.push("claim round");
+    if (!round || round.options[round.correct] !== "Верно про Тералин") errors.push("claim hit");
+    if (round && round.options.filter((text) => text.startsWith("Мимо")).length !== 3) errors.push("claim decoys");
+    if (claimRound("femorin", () => 0)) errors.push("claim empty");
+    if (finishVisit(0, "hit", "hit") !== 0) errors.push("zero stays zero");
+    if (finishVisit(80, null, null) !== 80) errors.push("plain visit");
+    if (finishVisit(80, "hit", null) !== 160) errors.push("rapport only");
+    if (finishVisit(80, null, "hit") !== 160) errors.push("claim only");
+    if (finishVisit(80, "miss", null) !== 40) errors.push("rapport miss only");
+    if (finishVisit(80, null, "miss") !== 80) errors.push("claim miss only");
+    if (finishVisit(80, "hit", "hit") !== 320) errors.push("both double");
+    if (finishVisit(80, "miss", "miss") !== 40) errors.push("claim miss keeps rapport half");
+    if (finishVisit(80, "hit", "miss") !== 160) errors.push("claim miss keeps rapport double");
+    if (finishVisit(80, "miss", "hit") !== 80) errors.push("miss then hit");
+    if (finishVisit(13, "miss", "miss") !== 7) errors.push("round once");
+    if (finishVisit(scoreVisit(surgeon, "teralin").points, "hit", "hit") !== 0) errors.push("dislike ignores factors");
+    if (!applyCatalog(defaultCatalog())) errors.push("restore after claims");
     if (WARM_REPLIES.length < 12 || COLD_REPLIES.length < 12) errors.push("reactions");
     [WARM_REPLIES, COLD_REPLIES].forEach((pool) => {
       pool.forEach((line) => {
@@ -917,6 +1008,10 @@
     pickDoctorInterests,
     rapportOptions,
     applyRapport,
+    claimsFor,
+    wrongClaimPool,
+    claimRound,
+    finishVisit,
     doctorReaction,
     reactionAgrees,
     pickClinicNames,

@@ -41,7 +41,7 @@
       <path d="M0 584 C240 568 440 598 660 580 C880 562 1040 592 1200 578 V680 H0 Z" fill="#9dcc72"/>
       <path d="M-20 574 C240 556 440 592 660 572 C880 552 1040 586 1220 568" fill="none" stroke="#243042" stroke-width="26" stroke-linecap="round"/>
       <path d="M-20 574 C240 556 440 592 660 572 C880 552 1040 586 1220 568" fill="none" stroke="#f3ecdf" stroke-width="2.6" stroke-dasharray="6 18" stroke-linecap="round"/>
-      <g class="menu-home" transform="translate(150 526)">
+      <g class="menu-house" transform="translate(150 526)">
         <g class="menu-home-body">
           <rect x="-10" y="-10" width="88" height="76" fill="transparent"/>
           <path d="M0 26 L34 0 L68 26 Z" fill="#e14b3c"/>
@@ -93,9 +93,6 @@
         <div class="menu-card">${cardHtml}</div>
       </div>
     </section>`;
-    root.querySelector(".menu-home")?.addEventListener("click", () => {
-      window.location.assign("/");
-    });
     root.querySelector("[data-action='logout']")?.addEventListener("click", logout);
   }
 
@@ -192,6 +189,14 @@
       }).join("");
       return `<tr><th data-spec="${esc(spec.id)}">${esc(spec.label)}</th>${cells}</tr>`;
     }).join("");
+    const claims = current.claims || {};
+    const wrong = Array.isArray(current.wrongClaims) ? current.wrongClaims : [];
+    const claimBlocks = current.drugs.map((drug) => `
+      <div class="admin-claim-block">
+        <h3 data-claim-title="${esc(drug.id)}">${esc(drug.name)}</h3>
+        <div class="admin-claims" data-claim-list="${esc(drug.id)}">${claimFields("drug-claim", claims[drug.id])}</div>
+        <button type="button" class="btn secondary admin-add" data-add-claim data-list="${esc(drug.id)}">Добавить утверждение</button>
+      </div>`).join("");
     const tone = catalogStatus && catalogStatus.ok ? "is-ok" : "is-bad";
     shell(`<form id="catalog-form">
         <section class="admin-card">
@@ -212,15 +217,62 @@
             </table>
           </div>
         </section>
+        <section class="admin-card">
+          <h2>Верные утверждения</h2>
+          <p class="admin-note">У каждого препарата свой список. В визите игроку попадётся одно верное утверждение этого препарата и три из общего пула неверных. Пустые строки не сохраняются.</p>
+          ${claimBlocks}
+        </section>
+        <section class="admin-card">
+          <h2>Неверные утверждения</h2>
+          <p class="admin-note">Общий пул для всех препаратов. Строк может быть сколько угодно. Одно и то же предложение не стоит повторять среди верных: иначе оно не попадёт в тройку неверных.</p>
+          <div class="admin-claims" data-claim-list="wrong">${claimFields("wrong-claim", wrong)}</div>
+          <button type="button" class="btn secondary admin-add" data-add-claim data-list="wrong">Добавить неверное</button>
+        </section>
         <div class="admin-actions">
           <p class="admin-status ${catalogStatus ? tone : ""}" role="status">${catalogStatus ? esc(catalogStatus.text) : ""}</p>
           <button class="btn" type="submit">Сохранить</button>
         </div>
       </form>`);
     root.querySelector("#catalog-form").addEventListener("submit", save);
+    root.querySelector("#catalog-form").addEventListener("click", onClaimClick);
     root.querySelectorAll('input[name="spec"], input[name="drug"]').forEach((input) => {
       input.addEventListener("input", syncHeadings);
     });
+  }
+
+  function claimFields(name, values) {
+    const list = Array.isArray(values) && values.length ? values : [""];
+    return list.map((text) => claimField(name, text)).join("");
+  }
+
+  function claimField(name, text) {
+    return `<div class="admin-claim">
+      <textarea name="${name}" rows="2" maxlength="240">${esc(text)}</textarea>
+      <button type="button" class="admin-claim-remove" data-remove-claim aria-label="Удалить утверждение">×</button>
+    </div>`;
+  }
+
+  function onClaimClick(event) {
+    const add = event.target.closest("[data-add-claim]");
+    if (add) {
+      const list = root.querySelector(`[data-claim-list="${add.dataset.list}"]`);
+      if (!list) return;
+      const name = add.dataset.list === "wrong" ? "wrong-claim" : "drug-claim";
+      list.insertAdjacentHTML("beforeend", claimField(name, ""));
+      const field = list.lastElementChild && list.lastElementChild.querySelector("textarea");
+      if (field) field.focus();
+      return;
+    }
+    const remove = event.target.closest("[data-remove-claim]");
+    if (!remove) return;
+    const row = remove.closest(".admin-claim");
+    const list = row && row.parentElement;
+    if (!row || !list) return;
+    row.remove();
+    if (!list.children.length) {
+      const name = list.dataset.claimList === "wrong" ? "wrong-claim" : "drug-claim";
+      list.insertAdjacentHTML("beforeend", claimField(name, ""));
+    }
   }
 
   function syncHeadings() {
@@ -231,6 +283,8 @@
     root.querySelectorAll('input[name="drug"]').forEach((input) => {
       const cell = root.querySelector(`th[data-drug="${input.dataset.id}"]`);
       if (cell) cell.textContent = input.value.trim() || "Препарат";
+      const title = root.querySelector(`[data-claim-title="${input.dataset.id}"]`);
+      if (title) title.textContent = input.value.trim() || "Препарат";
     });
   }
 
@@ -241,8 +295,13 @@
       const input = root.querySelector(`input[name="spec"][data-id="${spec.id}"]`);
       return { ...spec, label: input.value };
     });
+    const claims = {};
     const drugs = base.drugs.map((drug) => {
       const input = root.querySelector(`input[name="drug"][data-id="${drug.id}"]`);
+      const list = root.querySelector(`[data-claim-list="${drug.id}"]`);
+      claims[drug.id] = list
+        ? [...list.querySelectorAll('textarea[name="drug-claim"]')].map((field) => field.value)
+        : [];
       return { ...drug, name: input.value };
     });
     const rates = {};
@@ -253,7 +312,11 @@
         rates[spec.id][drug.id] = Number(select.value);
       });
     });
-    return { token, catalog: { specialties, drugs, rates } };
+    const wrongList = root.querySelector('[data-claim-list="wrong"]');
+    const wrongClaims = wrongList
+      ? [...wrongList.querySelectorAll('textarea[name="wrong-claim"]')].map((field) => field.value)
+      : [];
+    return { token, catalog: { specialties, drugs, rates, claims, wrongClaims } };
   }
 
   async function save(event) {

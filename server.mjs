@@ -35,6 +35,7 @@ const types = {
   ".json": "application/json; charset=utf-8",
   ".webp": "image/webp",
   ".png": "image/png",
+  ".woff2": "font/woff2",
 };
 
 function readBody(req) {

@@ -159,6 +159,34 @@
 
 .admin-table tbody th { text-align: left; white-space: nowrap; }
 
+.admin-claim-block + .admin-claim-block { margin-top: 16px; }
+.admin-claim-block h3 { margin: 0 0 8px; font-size: 16px; }
+.admin-claims { display: grid; gap: 8px; }
+.admin-claim { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.admin-claim textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 10px 12px;
+  font: inherit;
+  line-height: 1.35;
+}
+.admin-claim textarea:focus { border-color: var(--ink); outline: none; }
+.admin-claim-remove {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  font-size: 22px;
+  line-height: 1;
+}
+.admin-add { width: auto; max-width: none; margin-top: 8px; }
+
 .admin-actions {
   display: flex;
   justify-content: space-between;
