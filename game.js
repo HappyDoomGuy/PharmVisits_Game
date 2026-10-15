@@ -17,19 +17,13 @@
   // Minutes on the edge from the parent to this slot.
   const EDGE_MINUTES = [0, 20, 20, 20, 30, 30];
 
-  const DRUGS = [
-    { id: "teralin", name: "Тералин", specialty: "therapist", audience: "терапевтов" },
-    { id: "femorin", name: "Феморин", specialty: "gynecologist", audience: "гинекологов" },
-    { id: "nevral", name: "Невролекс", specialty: "neurologist", audience: "неврологов" },
-    { id: "regenox", name: "Регенокс", specialty: "surgeon", audience: "хирургов" },
-  ];
-
-  const SPECIALTIES = {
-    therapist: { label: "Терапевт", mark: "Т", color: "#0f766e" },
-    gynecologist: { label: "Гинеколог", mark: "Г", color: "#be3a6a" },
-    neurologist: { label: "Невролог", mark: "Н", color: "#3451a3" },
-    surgeon: { label: "Хирург", mark: "Х", color: "#d06a1f" },
-  };
+  const SPEC_IDS = ["therapist", "gynecologist", "neurologist", "surgeon"];
+  const DRUG_IDS = ["teralin", "femorin", "nevral", "regenox"];
+  const SLOT_COLORS = ["#0f766e", "#be3a6a", "#3451a3", "#d06a1f"];
+  const SCORE_RATES = [100, 50, 25, 0];
+  const DRUGS = [];
+  const SPECIALTIES = {};
+  let catalog = null;
 
   const DOCTORS = [
     { id: 1, name: "Капелька Пульсова", specialty: "therapist", dislike: null, female: true },
@@ -63,6 +57,117 @@
     { id: 29, name: "Импульс Проводимов", specialty: "neurologist", dislike: "regenox", female: false },
     { id: 30, name: "Витамин Иммунов", specialty: "therapist", dislike: null, female: false },
   ];
+
+  const DISLIKE_DOCTORS = new Set(
+    DOCTORS.filter((doctor) => doctor.dislike).map((doctor) => doctor.id)
+  );
+
+  function cleanLabel(value) {
+    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 40);
+  }
+
+  function specialtyMark(label, index) {
+    const letter = cleanLabel(label).charAt(0).toUpperCase();
+    return letter || String(index + 1);
+  }
+
+  function defaultCatalog() {
+    const specNames = ["Терапевт", "Гинеколог", "Невролог", "Хирург"];
+    const drugNames = ["Тералин", "Феморин", "Невролекс", "Регенокс"];
+    const rates = {};
+    SPEC_IDS.forEach((specId, specIndex) => {
+      rates[specId] = {};
+      DRUG_IDS.forEach((drugId, drugIndex) => {
+        rates[specId][drugId] = specIndex === drugIndex ? 100 : 50;
+      });
+    });
+    return {
+      specialties: SPEC_IDS.map((id, index) => ({
+        id,
+        label: specNames[index],
+        color: SLOT_COLORS[index],
+        mark: specialtyMark(specNames[index], index),
+      })),
+      drugs: DRUG_IDS.map((id, index) => ({ id, name: drugNames[index] })),
+      rates,
+    };
+  }
+
+  function normalizeCatalog(input) {
+    if (!input || typeof input !== "object") return null;
+    const specialties = [];
+    for (let index = 0; index < SPEC_IDS.length; index += 1) {
+      const id = SPEC_IDS[index];
+      const row = Array.isArray(input.specialties)
+        ? input.specialties.find((item) => item && item.id === id)
+        : null;
+      const label = cleanLabel(row && row.label);
+      if (!label) return null;
+      specialties.push({
+        id,
+        label,
+        color: SLOT_COLORS[index],
+        mark: specialtyMark(label, index),
+      });
+    }
+    const drugs = [];
+    for (let index = 0; index < DRUG_IDS.length; index += 1) {
+      const id = DRUG_IDS[index];
+      const row = Array.isArray(input.drugs)
+        ? input.drugs.find((item) => item && item.id === id)
+        : null;
+      const name = cleanLabel(row && row.name);
+      if (!name) return null;
+      drugs.push({ id, name });
+    }
+    const rates = {};
+    for (let specIndex = 0; specIndex < SPEC_IDS.length; specIndex += 1) {
+      const specId = SPEC_IDS[specIndex];
+      const row = input.rates && input.rates[specId];
+      rates[specId] = {};
+      for (let drugIndex = 0; drugIndex < DRUG_IDS.length; drugIndex += 1) {
+        const drugId = DRUG_IDS[drugIndex];
+        const rate = Number(row && row[drugId]);
+        if (!SCORE_RATES.includes(rate)) return null;
+        rates[specId][drugId] = rate;
+      }
+    }
+    return { specialties, drugs, rates };
+  }
+
+  function installCatalog(next) {
+    catalog = next;
+    DRUGS.splice(0, DRUGS.length, ...next.drugs.map((drug) => ({ id: drug.id, name: drug.name })));
+    Object.keys(SPECIALTIES).forEach((key) => delete SPECIALTIES[key]);
+    next.specialties.forEach((spec) => {
+      SPECIALTIES[spec.id] = { label: spec.label, mark: spec.mark, color: spec.color };
+    });
+  }
+
+  function applyCatalog(input) {
+    const next = normalizeCatalog(input);
+    if (!next) return false;
+    installCatalog(next);
+    return true;
+  }
+
+  function currentCatalog() {
+    return JSON.parse(JSON.stringify(catalog));
+  }
+
+  function usedRates() {
+    const found = new Set();
+    Object.keys(catalog.rates).forEach((specId) => {
+      Object.keys(catalog.rates[specId]).forEach((drugId) => found.add(catalog.rates[specId][drugId]));
+    });
+    return SCORE_RATES.filter((rate) => found.has(rate));
+  }
+
+  function pointsAt(base, rate) {
+    return Math.round(Number(base) * Number(rate) / 100);
+  }
+
+  installCatalog(defaultCatalog());
 
   function doctorById(id) {
     return DOCTORS.find((doctor) => doctor.id === id) || null;
@@ -349,15 +454,59 @@
     return travelMinutes(route, from, doctorId) + VISIT_MINUTES;
   }
 
+  function rateOf(specialtyId, drugId) {
+    const row = catalog.rates[specialtyId];
+    if (!row || !Object.prototype.hasOwnProperty.call(row, drugId)) return 0;
+    return row[drugId];
+  }
+
+  function outcomeForRate(rate) {
+    if (rate === 100) return "full";
+    if (rate === 50) return "half";
+    if (rate === 25) return "quarter";
+    return "none";
+  }
+
+  function bestDrugIds(specialtyId) {
+    let best = 0;
+    DRUG_IDS.forEach((drugId) => {
+      const rate = rateOf(specialtyId, drugId);
+      if (rate > best) best = rate;
+    });
+    if (best <= 0) return [];
+    return DRUG_IDS.filter((drugId) => rateOf(specialtyId, drugId) === best);
+  }
+
+  function assignRoster(doctorIds, random) {
+    const rng = random || Math.random;
+    const bag = [];
+    while (bag.length < doctorIds.length) bag.push(...shuffle(SPEC_IDS, rng));
+    const dealt = bag.slice(0, doctorIds.length);
+    const roster = {};
+    doctorIds.forEach((id, index) => {
+      const specialty = dealt[index];
+      let dislike = null;
+      if (DISLIKE_DOCTORS.has(id)) {
+        const protectedIds = new Set(bestDrugIds(specialty));
+        const pool = DRUG_IDS.filter((drugId) => !protectedIds.has(drugId));
+        const choices = pool.length ? pool : DRUG_IDS.slice();
+        dislike = choices[Math.floor(rng() * choices.length)];
+      }
+      roster[id] = { specialty, dislike };
+    });
+    return roster;
+  }
+
   function scoreVisit(doctor, drugId) {
     if (doctor.dislike && doctor.dislike === drugId) {
-      return { points: 0, outcome: "dislike" };
+      return { points: 0, outcome: "dislike", rate: 0 };
     }
-    const drug = drugById(drugId);
-    if (drug && drug.specialty === doctor.specialty) {
-      return { points: doctor.points, outcome: "full" };
-    }
-    return { points: doctor.points / 2, outcome: "half" };
+    const rate = rateOf(doctor.specialty, drugId);
+    return {
+      points: pointsAt(doctor.points, rate),
+      outcome: outcomeForRate(rate),
+      rate,
+    };
   }
 
   function plural(n, one, few, many) {
@@ -482,9 +631,18 @@
     if (scoreVisit(surgeon, "regenox").points !== 16) errors.push("surgeon match");
     if (scoreVisit(surgeon, "femorin").points !== 8) errors.push("surgeon half");
 
+    if (pointsAt(80, 25) !== 20) errors.push("quarter");
+    if (pointsAt(20, 0) !== 0) errors.push("zero rate");
+    if (pointsAt(100, 100) !== 100) errors.push("full rate");
+    const seeded = assignRoster([1, 2, 3, 4, 5], () => 0);
+    if (seeded[1].specialty !== "gynecologist" || seeded[1].dislike !== null) errors.push("roster open");
+    if (seeded[2].specialty !== "neurologist" || seeded[2].dislike !== "teralin") errors.push("roster dislike");
+    if (Object.keys(assignRoster([1, 2, 3], () => 0.5)).length !== 3) errors.push("roster size");
+
     DOCTORS.forEach((doctor) => {
       if (!SPECIALTIES[doctor.specialty]) errors.push(`specialty ${doctor.id}`);
-      if (doctor.dislike && drugById(doctor.dislike).specialty === doctor.specialty) {
+      if (doctor.dislike && !drugById(doctor.dislike)) errors.push(`dislike drug ${doctor.id}`);
+      if (doctor.dislike && rateOf(doctor.specialty, doctor.dislike) === 100) {
         errors.push(`dislike overlaps specialty for ${doctor.id}`);
       }
     });
@@ -562,9 +720,18 @@
     DRUGS,
     DOCTORS,
     SPECIALTIES,
+    SCORE_RATES,
     doctorById,
     drugById,
     specialtyOf,
+    defaultCatalog,
+    normalizeCatalog,
+    applyCatalog,
+    currentCatalog,
+    usedRates,
+    pointsAt,
+    assignRoster,
+    rateOf,
     CLINIC_NAMES,
     HOBBIES,
     hobbyById,
