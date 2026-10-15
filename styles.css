@@ -2466,11 +2466,26 @@ h1 {
 .visit-actions { display: grid; gap: 14px; margin-top: 14px; }
 .claim-sheet .menu-modal-head { margin-bottom: 6px; }
 .claim-sheet .claim-note {
-  margin: 0 0 10px;
+  margin: 0 0 14px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
+}
+.claim-sheet .claim-drug {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 18px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #3451a3;
+  color: #fffdf8;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  box-shadow: 0 4px 10px rgba(52, 81, 163, 0.22);
 }
 .claim-sheet .replies { gap: 14px; margin-top: 14px; }
 .claim-sheet .reply { min-height: 52px; }

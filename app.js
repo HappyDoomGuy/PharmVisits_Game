@@ -2689,7 +2689,7 @@
           </button>
         </div>
         <p class="claim-note">Выберите утверждение, соответствующее промоплану</p>
-        <p class="sub">${esc(drug ? drug.name : "")}</p>
+        ${drug && drug.name ? `<p class="claim-drug">${esc(drug.name)}</p>` : ""}
         ${body}
       </div>
     </div>`;
