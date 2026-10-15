@@ -54,6 +54,7 @@
   }
 
   let view = "catalog";
+  let claimDrug = "";
   let catalog = null;
   let catalogStatus = null;
   let players = [];
@@ -143,6 +144,7 @@
   function shell(body) {
     const tabs = [
       ["catalog", "Каталог"],
+      ["claims", "Утверждения"],
       ["players", "Участники"],
       ["roster", "Справочник"],
     ];
@@ -157,6 +159,7 @@
 
   function openView(next) {
     if (next === view && next !== "players") return;
+    readOpenForm();
     view = next;
     if (next === "players") loadPlayers();
     else render();
@@ -165,6 +168,7 @@
   function render() {
     if (view === "players") renderPlayers();
     else if (view === "roster") renderRoster();
+    else if (view === "claims") renderClaims();
     else renderCatalog();
   }
 
@@ -189,14 +193,6 @@
       }).join("");
       return `<tr><th data-spec="${esc(spec.id)}">${esc(spec.label)}</th>${cells}</tr>`;
     }).join("");
-    const claims = current.claims || {};
-    const wrong = Array.isArray(current.wrongClaims) ? current.wrongClaims : [];
-    const claimBlocks = current.drugs.map((drug) => `
-      <div class="admin-claim-block">
-        <h3 data-claim-title="${esc(drug.id)}">${esc(drug.name)}</h3>
-        <div class="admin-claims" data-claim-list="${esc(drug.id)}">${claimFields("drug-claim", claims[drug.id])}</div>
-        <button type="button" class="btn secondary admin-add" data-add-claim data-list="${esc(drug.id)}">Добавить утверждение</button>
-      </div>`).join("");
     const tone = catalogStatus && catalogStatus.ok ? "is-ok" : "is-bad";
     shell(`<form id="catalog-form">
         <section class="admin-card">
@@ -217,62 +213,194 @@
             </table>
           </div>
         </section>
-        <section class="admin-card">
-          <h2>Верные утверждения</h2>
-          <p class="admin-note">У каждого препарата свой список. В визите игроку попадётся одно верное утверждение этого препарата и три из общего пула неверных. Пустые строки не сохраняются.</p>
-          ${claimBlocks}
-        </section>
-        <section class="admin-card">
-          <h2>Неверные утверждения</h2>
-          <p class="admin-note">Общий пул для всех препаратов. Строк может быть сколько угодно. Одно и то же предложение не стоит повторять среди верных: иначе оно не попадёт в тройку неверных.</p>
-          <div class="admin-claims" data-claim-list="wrong">${claimFields("wrong-claim", wrong)}</div>
-          <button type="button" class="btn secondary admin-add" data-add-claim data-list="wrong">Добавить неверное</button>
-        </section>
         <div class="admin-actions">
           <p class="admin-status ${catalogStatus ? tone : ""}" role="status">${catalogStatus ? esc(catalogStatus.text) : ""}</p>
           <button class="btn" type="submit">Сохранить</button>
         </div>
       </form>`);
     root.querySelector("#catalog-form").addEventListener("submit", save);
-    root.querySelector("#catalog-form").addEventListener("click", onClaimClick);
     root.querySelectorAll('input[name="spec"], input[name="drug"]').forEach((input) => {
       input.addEventListener("input", syncHeadings);
     });
   }
 
+  function ensureCatalog() {
+    if (!catalog) catalog = G.currentCatalog();
+    return catalog;
+  }
+
+  function readOpenForm() {
+    if (view === "catalog") readCatalogForm();
+    else if (view === "claims") readClaimsForm();
+  }
+
+  function readCatalogForm() {
+    const current = ensureCatalog();
+    if (!root.querySelector("#catalog-form")) return;
+    current.specialties = current.specialties.map((spec) => {
+      const input = root.querySelector(`input[name="spec"][data-id="${spec.id}"]`);
+      return input ? { ...spec, label: input.value } : spec;
+    });
+    current.drugs = current.drugs.map((drug) => {
+      const input = root.querySelector(`input[name="drug"][data-id="${drug.id}"]`);
+      return input ? { ...drug, name: input.value } : drug;
+    });
+    const rates = {};
+    current.specialties.forEach((spec) => {
+      rates[spec.id] = {};
+      current.drugs.forEach((drug) => {
+        const select = root.querySelector(`select[data-spec="${spec.id}"][data-drug="${drug.id}"]`);
+        const previous = current.rates && current.rates[spec.id] ? current.rates[spec.id][drug.id] : 0;
+        rates[spec.id][drug.id] = select ? Number(select.value) : previous;
+      });
+    });
+    current.rates = rates;
+  }
+
+  function readClaimsForm() {
+    const current = ensureCatalog();
+    if (!root.querySelector("#claims-form")) return;
+    const claims = {};
+    current.drugs.forEach((drug) => {
+      const list = root.querySelector(`[data-claim-list="${drug.id}"]`);
+      claims[drug.id] = list
+        ? [...list.querySelectorAll('input[name="drug-claim"]')].map((field) => field.value)
+        : (current.claims && current.claims[drug.id]) || [];
+    });
+    current.claims = claims;
+    const wrongList = root.querySelector('[data-claim-list="wrong"]');
+    if (wrongList) {
+      current.wrongClaims = [...wrongList.querySelectorAll('input[name="wrong-claim"]')].map((field) => field.value);
+    }
+  }
+
+  function filledCount(values) {
+    return (Array.isArray(values) ? values : []).filter((text) => String(text).trim()).length;
+  }
+
+  function renderClaims() {
+    const current = ensureCatalog();
+    const claims = current.claims || {};
+    const wrong = Array.isArray(current.wrongClaims) ? current.wrongClaims : [];
+    if (!current.drugs.some((drug) => drug.id === claimDrug)) {
+      claimDrug = current.drugs[0] ? current.drugs[0].id : "";
+    }
+    const chips = current.drugs.map((drug) => {
+      const on = drug.id === claimDrug;
+      return `<button type="button" class="claim-chip${on ? " is-on" : ""}" data-claim-drug="${esc(drug.id)}" role="tab" aria-selected="${on ? "true" : "false"}">${esc(drug.name)}<b class="claim-count">${filledCount(claims[drug.id])}</b></button>`;
+    }).join("");
+    const panels = current.drugs.map((drug) => {
+      const list = Array.isArray(claims[drug.id]) ? claims[drug.id] : [];
+      const on = drug.id === claimDrug;
+      return `<div class="admin-claim-block${on ? " is-on" : ""}" data-claim-panel="${esc(drug.id)}">
+          <p class="admin-claim-empty" data-claim-empty="${esc(drug.id)}"${list.length ? " hidden" : ""}>Верных утверждений пока нет</p>
+          <div class="admin-claims" data-claim-list="${esc(drug.id)}">${claimFields("drug-claim", list)}</div>
+        </div>`;
+    }).join("");
+    const tone = catalogStatus && catalogStatus.ok ? "is-ok" : "is-bad";
+    shell(`<form id="claims-form">
+        <p class="admin-note">В визите одно верное утверждение выбранного препарата и три неверных из общего пула. Пустые строки не сохраняются.</p>
+        <div class="claim-split">
+          <section class="admin-card">
+            <div class="claim-head">
+              <h2>Верные</h2>
+              <button type="button" class="claim-add" data-add-claim data-correct-add data-list="${esc(claimDrug)}">Добавить</button>
+            </div>
+            <div class="claim-chips" role="tablist">${chips}</div>
+            <div class="claim-lists">${panels}</div>
+          </section>
+          <section class="admin-card">
+            <div class="claim-head">
+              <h2>Неверные <b class="claim-count" data-wrong-count>${filledCount(wrong)}</b></h2>
+              <button type="button" class="claim-add" data-add-claim data-list="wrong">Добавить</button>
+            </div>
+            <p class="admin-claim-empty" data-claim-empty="wrong"${wrong.length ? " hidden" : ""}>Неверных утверждений пока нет</p>
+            <div class="admin-claim-scroll">
+              <div class="admin-claims" data-claim-list="wrong">${claimFields("wrong-claim", wrong)}</div>
+            </div>
+          </section>
+        </div>
+        <div class="admin-actions">
+          <p class="admin-status ${catalogStatus ? tone : ""}" role="status">${catalogStatus ? esc(catalogStatus.text) : ""}</p>
+          <button class="btn" type="submit">Сохранить</button>
+        </div>
+      </form>`);
+    const form = root.querySelector("#claims-form");
+    form.addEventListener("submit", save);
+    form.addEventListener("click", onClaimClick);
+    form.addEventListener("input", refreshClaimMeta);
+  }
+
   function claimFields(name, values) {
-    const list = Array.isArray(values) && values.length ? values : [""];
+    const list = Array.isArray(values) ? values : [];
     return list.map((text) => claimField(name, text)).join("");
   }
 
   function claimField(name, text) {
     return `<div class="admin-claim">
-      <textarea name="${name}" rows="2" maxlength="240">${esc(text)}</textarea>
+      <input name="${name}" value="${esc(text)}" maxlength="240" placeholder="Утверждение" title="${esc(text)}" autocomplete="off">
       <button type="button" class="admin-claim-remove" data-remove-claim aria-label="Удалить утверждение">×</button>
     </div>`;
   }
 
+  function showClaimDrug(id) {
+    claimDrug = id;
+    const add = root.querySelector("[data-correct-add]");
+    if (add) add.dataset.list = id;
+    root.querySelectorAll("[data-claim-drug]").forEach((button) => {
+      const on = button.dataset.claimDrug === id;
+      button.classList.toggle("is-on", on);
+      button.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    root.querySelectorAll("[data-claim-panel]").forEach((panel) => {
+      panel.classList.toggle("is-on", panel.dataset.claimPanel === id);
+    });
+  }
+
+  function refreshClaimMeta() {
+    root.querySelectorAll("[data-claim-drug]").forEach((button) => {
+      const list = root.querySelector(`[data-claim-list="${button.dataset.claimDrug}"]`);
+      const badge = button.querySelector(".claim-count");
+      if (!list || !badge) return;
+      badge.textContent = String([...list.querySelectorAll("input")].filter((field) => field.value.trim()).length);
+    });
+    const wrong = root.querySelector('[data-claim-list="wrong"]');
+    const wrongBadge = root.querySelector("[data-wrong-count]");
+    if (wrong && wrongBadge) {
+      wrongBadge.textContent = String([...wrong.querySelectorAll("input")].filter((field) => field.value.trim()).length);
+    }
+    root.querySelectorAll("[data-claim-empty]").forEach((hint) => {
+      const list = root.querySelector(`[data-claim-list="${hint.dataset.claimEmpty}"]`);
+      hint.hidden = !!(list && list.children.length);
+    });
+  }
+
   function onClaimClick(event) {
+    const chip = event.target.closest("[data-claim-drug]");
+    if (chip) {
+      showClaimDrug(chip.dataset.claimDrug);
+      return;
+    }
     const add = event.target.closest("[data-add-claim]");
     if (add) {
       const list = root.querySelector(`[data-claim-list="${add.dataset.list}"]`);
       if (!list) return;
       const name = add.dataset.list === "wrong" ? "wrong-claim" : "drug-claim";
       list.insertAdjacentHTML("beforeend", claimField(name, ""));
-      const field = list.lastElementChild && list.lastElementChild.querySelector("textarea");
-      if (field) field.focus();
+      const field = list.lastElementChild && list.lastElementChild.querySelector("input");
+      if (field) {
+        field.focus();
+        field.scrollIntoView({ block: "nearest" });
+      }
+      refreshClaimMeta();
       return;
     }
     const remove = event.target.closest("[data-remove-claim]");
     if (!remove) return;
     const row = remove.closest(".admin-claim");
-    const list = row && row.parentElement;
-    if (!row || !list) return;
+    if (!row) return;
     row.remove();
-    if (!list.children.length) {
-      const name = list.dataset.claimList === "wrong" ? "wrong-claim" : "drug-claim";
-      list.insertAdjacentHTML("beforeend", claimField(name, ""));
-    }
+    refreshClaimMeta();
   }
 
   function syncHeadings() {
@@ -283,40 +411,22 @@
     root.querySelectorAll('input[name="drug"]').forEach((input) => {
       const cell = root.querySelector(`th[data-drug="${input.dataset.id}"]`);
       if (cell) cell.textContent = input.value.trim() || "Препарат";
-      const title = root.querySelector(`[data-claim-title="${input.dataset.id}"]`);
-      if (title) title.textContent = input.value.trim() || "Препарат";
     });
   }
 
   function collect() {
-    const token = password();
-    const base = G.currentCatalog();
-    const specialties = base.specialties.map((spec) => {
-      const input = root.querySelector(`input[name="spec"][data-id="${spec.id}"]`);
-      return { ...spec, label: input.value };
-    });
-    const claims = {};
-    const drugs = base.drugs.map((drug) => {
-      const input = root.querySelector(`input[name="drug"][data-id="${drug.id}"]`);
-      const list = root.querySelector(`[data-claim-list="${drug.id}"]`);
-      claims[drug.id] = list
-        ? [...list.querySelectorAll('textarea[name="drug-claim"]')].map((field) => field.value)
-        : [];
-      return { ...drug, name: input.value };
-    });
-    const rates = {};
-    specialties.forEach((spec) => {
-      rates[spec.id] = {};
-      drugs.forEach((drug) => {
-        const select = root.querySelector(`select[data-spec="${spec.id}"][data-drug="${drug.id}"]`);
-        rates[spec.id][drug.id] = Number(select.value);
-      });
-    });
-    const wrongList = root.querySelector('[data-claim-list="wrong"]');
-    const wrongClaims = wrongList
-      ? [...wrongList.querySelectorAll('textarea[name="wrong-claim"]')].map((field) => field.value)
-      : [];
-    return { token, catalog: { specialties, drugs, rates, claims, wrongClaims } };
+    readOpenForm();
+    const current = ensureCatalog();
+    return {
+      token: password(),
+      catalog: {
+        specialties: current.specialties,
+        drugs: current.drugs,
+        rates: current.rates,
+        claims: current.claims || {},
+        wrongClaims: Array.isArray(current.wrongClaims) ? current.wrongClaims : [],
+      },
+    };
   }
 
   async function save(event) {
@@ -339,17 +449,17 @@
       if (!response.ok || !data.catalog) {
         catalog = collected.catalog;
         catalogStatus = { ok: false, text: data.error || "Не удалось сохранить." };
-        renderCatalog();
+        render();
         return;
       }
       G.applyCatalog(data.catalog);
       catalog = data.catalog;
       catalogStatus = { ok: true, text: "Сохранено в Turso. Игра подхватит таблицу при обновлении." };
-      renderCatalog();
+      render();
     } catch (error) {
       catalog = collected.catalog;
       catalogStatus = { ok: false, text: "Нет связи с сервером." };
-      renderCatalog();
+      render();
     }
   }
 
@@ -556,11 +666,11 @@
           ? "Таблица загружена из Turso."
           : "Показан встроенный набор. После сохранения игра будет брать таблицу из Turso.";
         catalogStatus = { ok: data.source === "turso", text: data.warning || text };
-        if (view === "catalog") renderCatalog();
+        if (view === "catalog" || view === "claims") render();
       }
     } catch (error) {
       catalogStatus = { ok: false, text: "База не ответила. Показан встроенный набор." };
-      if (view === "catalog") renderCatalog();
+      if (view === "catalog" || view === "claims") render();
     }
   }
 

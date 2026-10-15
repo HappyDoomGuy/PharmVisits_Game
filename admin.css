@@ -159,33 +159,163 @@
 
 .admin-table tbody th { text-align: left; white-space: nowrap; }
 
-.admin-claim-block + .admin-claim-block { margin-top: 16px; }
-.admin-claim-block h3 { margin: 0 0 8px; font-size: 16px; }
-.admin-claims { display: grid; gap: 8px; }
-.admin-claim { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
-.admin-claim textarea {
-  width: 100%;
-  min-height: 64px;
-  resize: vertical;
-  border: 1.5px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  padding: 10px 12px;
-  font: inherit;
-  line-height: 1.35;
+.admin-menu .board-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.menu-card .claim-head h2 { margin: 0; }
+
+.claim-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
 }
-.admin-claim textarea:focus { border-color: var(--ink); outline: none; }
-.admin-claim-remove {
-  width: 44px;
-  height: 44px;
+
+.claim-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5em;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.7;
+}
+
+.claim-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.claim-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(36, 48, 66, 0.06);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.claim-chip.is-on {
+  background: #1e2430;
+  color: #fffdf8;
+}
+
+.claim-chip .claim-count { margin-left: 0; }
+.claim-chip.is-on .claim-count {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fffdf8;
+}
+
+.claim-add {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--teal);
+  color: #f3fffb;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-claim-block { display: none; }
+.admin-claim-block.is-on { display: block; }
+
+.admin-claim-empty {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-claim-empty[hidden] { display: none; }
+
+.admin-claim-block.is-on .admin-claims,
+.admin-claim-scroll {
+  padding: 8px;
   border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.admin-claim-block.is-on .admin-claims:empty { display: none; }
+
+.admin-menu #claims-form {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.claim-split {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.claim-split > .admin-card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.claim-split > .admin-card + .admin-card {
+  padding-top: 0;
+  border-top: 0;
+  border-left: 1px solid rgba(228, 220, 203, 0.95);
+  padding-left: 16px;
+}
+
+.claim-lists,
+.admin-claim-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(30, 36, 48, 0.4) transparent;
+}
+
+.admin-claims { display: grid; gap: 6px; }
+.admin-claim {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 6px;
+  align-items: center;
+}
+.admin-claim input {
+  width: 100%;
+  min-height: 34px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 14px;
+}
+.admin-claim input:focus { border-color: var(--ink); outline: none; }
+.admin-claim-remove {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
   color: var(--muted);
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--line);
-  font-size: 22px;
+  font-size: 16px;
   line-height: 1;
 }
-.admin-add { width: auto; max-width: none; margin-top: 8px; }
 
 .admin-actions {
   display: flex;
@@ -266,6 +396,15 @@
 .admin-text:disabled { opacity: 0.35; }
 
 @media (max-width: 720px) {
+  .admin-menu .board-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .claim-split { grid-template-columns: 1fr; }
+  .claim-split > .admin-card + .admin-card {
+    border-left: 0;
+    padding-left: 0;
+    padding-top: 14px;
+    border-top: 1px solid rgba(228, 220, 203, 0.95);
+  }
+  .admin-claim-scroll { max-height: 240px; flex: none; }
   .admin-names { grid-template-columns: 1fr; }
   .admin-actions,
   .admin-card-head,
