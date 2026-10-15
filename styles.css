@@ -2846,7 +2846,7 @@ h1 {
 .result-notes .is-same { background: #f6f1e7; color: #3d4a5c; }
 .result-status {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 12px 0 4px;
   padding: 0;

@@ -2777,7 +2777,6 @@
       <div class="result-notes">${noteHtml}</div>
       <ul class="result-status">
         <li><span>Счёт</span><b class="num">${esc(G.formatScore(state.score))}</b></li>
-        <li><span>Часы</span><b class="num">${G.formatClock(minutesUsed())}</b></li>
         <li><span>Осталось</span><b>${esc(G.formatDuration(state.minutesLeft))}</b></li>
       </ul>
       ${actions}`;
@@ -3068,11 +3067,14 @@
 
   function pickDrug(id) {
     if (state.phase !== "visit" || !drugPicker || !G.drugById(id)) return;
-    if (state.selectedDrug === id) {
+    if (state.selectedDrug === id && !drugCommit) {
+      drugPicker = false;
       if (!drugHasClaims(id)) {
-        drugPicker = false;
         present();
+        return;
       }
+      persist();
+      renderOverlay();
       return;
     }
     const grid = document.querySelector("#drug-modal .drugs");
