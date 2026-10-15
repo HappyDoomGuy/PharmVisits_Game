@@ -2739,18 +2739,20 @@
       none: `${drug.name} не даёт баллов для специальности «${specLabel}».`,
       dislike: `${doctor.name.split(" ")[0]} не назначает ${drug.name}.`,
     };
-    let detail = texts[entry.outcome];
-    detail += factorSentence(entry.rapport, entry.drugPoints, "Реплика попала в интересы, баллы удвоены.", "Реплика мимо интересов, баллы срезаны наполовину.", "Реплика попала в интересы.", "Реплика мимо интересов.");
-    detail += factorSentence(entry.claim, entry.drugPoints, "Утверждение верное, баллы удвоены.", "Утверждение неверное, баллы без бонуса.", "Утверждение верное, на ноль это не влияет.", "Утверждение неверное, на ноль это не влияет.");
-    if (entry.drugPoints > 0 && (entry.rapport || entry.claim === "hit")) {
-      const bits = [`за препарат ${G.formatScore(entry.drugPoints)}`];
-      if (entry.rapport === "hit") bits.push("интересы ×2");
-      else if (entry.rapport === "miss") bits.push("интересы ÷2");
-      if (entry.claim === "hit") bits.push("утверждение ×2");
-      detail = `${bits.join(" · ")}. ${detail}`;
-    }
-    const scaled = entry.rapport || entry.claim === "hit";
-    const cap = scaled ? "" : `из ${G.formatScore(entry.maxPoints)} · `;
+    const factors = [];
+    const factorChip = (label, value, kind) => `<li class="${kind}"><span>${esc(label)}</span><b>${esc(value)}</b></li>`;
+    factors.push(factorChip("Препарат", G.formatScore(entry.drugPoints), entry.drugPoints > 0 ? "" : "is-zero"));
+    if (!(entry.rapport || entry.claim === "hit")) factors.push(factorChip("Потолок", `из ${G.formatScore(entry.maxPoints)}`, ""));
+    if (entry.rapport === "hit") factors.push(factorChip("Интересы", "×2", "is-up"));
+    else if (entry.rapport === "miss") factors.push(factorChip("Интересы", "÷2", "is-down"));
+    if (entry.claim === "hit") factors.push(factorChip("Утверждение", "×2", "is-up"));
+    else if (entry.claim === "miss") factors.push(factorChip("Утверждение", "без бонуса", "is-same"));
+    const notes = [{ text: texts[entry.outcome], kind: "" }];
+    const rapportNote = factorSentence(entry.rapport, entry.drugPoints, "Реплика попала в интересы, баллы удвоены.", "Реплика мимо интересов, баллы срезаны наполовину.", "Реплика попала в интересы.", "Реплика мимо интересов.").trim();
+    if (rapportNote) notes.push({ text: rapportNote, kind: entry.rapport === "hit" ? "is-up" : "is-down" });
+    const claimNote = factorSentence(entry.claim, entry.drugPoints, "Утверждение верное, баллы удвоены.", "Утверждение неверное, баллы без бонуса.", "Утверждение верное, на ноль это не влияет.", "Утверждение неверное, на ноль это не влияет.").trim();
+    if (claimNote) notes.push({ text: claimNote, kind: entry.claim === "hit" ? "is-up" : "is-same" });
+    const noteHtml = notes.map((note) => `<p class="${note.kind}">${esc(note.text)}</p>`).join("");
     const allDone = state.visited.length >= totalDoctorSlots();
     const nextLabel = allDone ? "К итогам дня" : "Дальше по маршруту";
     const actions = allDone
@@ -2771,8 +2773,13 @@
         <div class="stamp ${entry.outcome}">${stamps[entry.outcome]}</div>
       </div>
       <p class="result-points ${entry.outcome} num">+${esc(G.formatScore(entry.points))}</p>
-      <p class="sub">${esc(cap + detail)}</p>
-      <p class="clock-note">Счёт ${esc(G.formatScore(state.score))}. На часах ${G.formatClock(minutesUsed())}, ещё ${esc(G.formatDuration(state.minutesLeft))}.</p>
+      <ul class="result-factors">${factors.join("")}</ul>
+      <div class="result-notes">${noteHtml}</div>
+      <ul class="result-status">
+        <li><span>Счёт</span><b class="num">${esc(G.formatScore(state.score))}</b></li>
+        <li><span>Часы</span><b class="num">${G.formatClock(minutesUsed())}</b></li>
+        <li><span>Осталось</span><b>${esc(G.formatDuration(state.minutesLeft))}</b></li>
+      </ul>
       ${actions}`;
   }
 
