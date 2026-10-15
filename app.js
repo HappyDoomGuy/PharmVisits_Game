@@ -778,7 +778,7 @@
   }
 
   const BOARD_TABS = [
-    ["points", "Очки", "Лучший результат за один день"],
+    ["points", "Рекордный день", "Лучший результат за один день"],
     ["days", "Дни", "Сколько дней завершено"],
     ["total", "Общий счёт", "Сумма баллов за все дни"],
   ];
@@ -845,7 +845,7 @@
     if (!card) return;
     const note = BOARD_TABS.find((tab) => tab[0] === boardTab);
     const tabs = BOARD_TABS.map(([id, label]) => {
-      const text = id === "total" ? "Общий<br>счёт" : label;
+      const text = id === "total" ? "Общий<br>счёт" : id === "points" ? "Рекордный<br>день" : label;
       return `<button type="button" class="${id === boardTab ? "is-on" : ""}" data-action="board-tab" data-board="${id}" role="tab" aria-selected="${id === boardTab ? "true" : "false"}"><span class="board-mark-ico" aria-hidden="true">${boardMarkIcon(id)}</span><span class="board-mark-label">${text}</span></button>`;
     }).join("");
     card.innerHTML = `<div class="board-sheet">
