@@ -23,7 +23,7 @@ function loadEnv(file) {
 }
 
 loadEnv(path.join(process.cwd(), ".env"));
-const { handleCatalog } = require("./catalog-api.js");
+const { handleCatalog, handleResults, handlePlayers } = require("./catalog-api.js");
 
 const root = process.cwd();
 const types = {
@@ -70,6 +70,51 @@ const server = http.createServer(async (req, res) => {
       }
     }
     const result = await handleCatalog(req.method, token, body);
+    res.writeHead(result.status, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify(result.json));
+    return;
+  }
+
+  if (url.pathname === "/api/players") {
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+    let body = null;
+    if (req.method === "POST") {
+      try {
+        body = await readBody(req);
+      } catch (error) {
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: "Некорректный JSON." }));
+        return;
+      }
+    }
+    const result = await handlePlayers(req.method, token, body);
+    res.writeHead(result.status, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify(result.json));
+    return;
+  }
+
+  if (url.pathname === "/api/results") {
+    let body = null;
+    if (req.method === "POST") {
+      try {
+        body = await readBody(req);
+      } catch (error) {
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: "Некорректный JSON." }));
+        return;
+      }
+    }
+    const result = await handleResults(req.method, {
+      name: url.searchParams.get("name") || "",
+      player: url.searchParams.get("player") || "",
+    }, body);
     res.writeHead(result.status, {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",

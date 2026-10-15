@@ -1,6 +1,7 @@
 (function () {
   const G = window.MPGame;
   const KEY = "mp-visit-day-v7";
+  const PLAYER_KEY = "mp-player-id";
   const PREV_KEYS = ["mp-visit-day-v6", "mp-visit-day-v5", "mp-visit-day-v4", "mp-visit-day-v3", "mp-visit-day-v2"];
 
   let state = null;
@@ -285,6 +286,24 @@
       '"': "&quot;",
       "'": "&#39;",
     }[ch]));
+  }
+
+  function playerId() {
+    let id = "";
+    try {
+      id = localStorage.getItem(PLAYER_KEY) || "";
+    } catch {
+      id = "";
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      id = crypto.randomUUID();
+      try {
+        localStorage.setItem(PLAYER_KEY, id);
+      } catch {
+        /* private mode */
+      }
+    }
+    return id;
   }
 
   function readSave(key) {
@@ -726,8 +745,113 @@
     setTimeout(() => el.remove(), 220);
   }
 
+  const BOARD_TABS = [
+    ["points", "Очки", "Лучший результат за один день"],
+    ["days", "Дни", "Сколько дней завершено"],
+    ["total", "Общий счёт", "Сумма баллов за все дни"],
+  ];
+  let boardTab = "points";
+  let boardData = null;
+
+  function boardValue(kind, value) {
+    if (kind === "days") return `${value} ${G.plural(value, "день", "дня", "дней")}`;
+    return G.formatScore(value);
+  }
+
+  function boardListHtml() {
+    if (!boardData) return `<p class="board-empty">Собираем таблицу…</p>`;
+    if (boardData.error) return `<p class="board-empty">${esc(boardData.error)}</p>`;
+    const rows = boardData[boardTab] || [];
+    if (!rows.length) return `<p class="board-empty">Пока нет завершённых дней.</p>`;
+    return `<ol class="board-list">${rows.map((row) => `<li class="${row.rank <= 3 ? `is-${row.rank}` : ""}${row.you ? " is-you" : ""}">
+      <span class="rank">${row.rank}</span>
+      <span class="who">${esc(row.name)}${row.you ? "<i>вы</i>" : ""}</span>
+      <span class="val num">${esc(boardValue(boardTab, row.value))}</span>
+    </li>`).join("")}</ol>`;
+  }
+
+  function paintBoard() {
+    const card = document.querySelector("#board-modal .menu-modal-card");
+    if (!card) return;
+    const note = BOARD_TABS.find((tab) => tab[0] === boardTab);
+    const tabs = BOARD_TABS.map(([id, label]) => `<button type="button" class="${id === boardTab ? "is-on" : ""}" data-action="board-tab" data-board="${id}" role="tab" aria-selected="${id === boardTab ? "true" : "false"}">${label}</button>`).join("");
+    card.innerHTML = `<div class="menu-modal-head">
+        <h2>Рекорд</h2>
+        <button type="button" class="menu-modal-close" data-action="close-board" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="board-tabs" role="tablist">${tabs}</div>
+      <p class="board-note">${esc(note[2])}</p>
+      ${boardListHtml()}`;
+  }
+
+  function openBoard() {
+    if (document.getElementById("board-modal")) return;
+    boardData = null;
+    const el = document.createElement("div");
+    el.className = "menu-modal";
+    el.id = "board-modal";
+    el.innerHTML = `<div class="menu-modal-card" role="dialog" aria-modal="true" aria-label="Рекорд"></div>`;
+    document.getElementById("app").appendChild(el);
+    paintBoard();
+    requestAnimationFrame(() => el.classList.add("is-open"));
+    const id = playerId();
+    const url = `/api/results?player=${encodeURIComponent(id)}`;
+    fetch(url, { cache: "no-store" })
+      .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+      .then(({ ok, data }) => {
+        if (!document.getElementById("board-modal")) return;
+        boardData = ok ? data : { error: data.error || "Таблица сейчас недоступна." };
+        paintBoard();
+      })
+      .catch(() => {
+        if (!document.getElementById("board-modal")) return;
+        boardData = { error: "Таблица сейчас недоступна." };
+        paintBoard();
+      });
+  }
+
+  function closeBoard() {
+    const el = document.getElementById("board-modal");
+    if (!el) return;
+    el.classList.remove("is-open");
+    setTimeout(() => el.remove(), 220);
+  }
+
+  async function rememberName(name) {
+    try {
+      const response = await fetch("/api/results", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, playerId: playerId() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.name) return data.name;
+    } catch (error) {}
+    return name;
+  }
+
+  function submitResult(name, score) {
+    fetch("/api/results", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, score: Math.round(score), playerId: playerId() }),
+    }).catch(() => {});
+  }
+
   let menuHomeTaps = 0;
   let menuHomeTapTimer = 0;
+
+  function recordButton(label) {
+    const save = loadSave();
+    const value = save.best ? G.formatScore(save.best) : "—";
+    return `<button type="button" class="menu-record" data-action="open-board">
+      <span class="menu-record-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></span>
+      <span class="menu-record-label">${esc(label)}</span>
+      <strong class="menu-record-value num">${esc(value)}</strong>
+    </button>`;
+  }
 
   function showStart() {
     menuHomeTaps = 0;
@@ -743,14 +867,6 @@
       : "";
     app.innerHTML = `<section class="start menu">
       ${menuSceneHtml()}
-      <button type="button" class="menu-roster-btn" data-action="show-roster" aria-label="Справочник" title="Справочник">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/>
-          <circle cx="10" cy="8" r="3.2"/>
-          <path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4"/>
-          <path d="M15.4 5.2a3.2 3.2 0 0 1 0 5.6"/>
-        </svg>
-      </button>
       ${soundbarHtml(true)}
       <div class="menu-shell">
         <header class="menu-title">
@@ -767,62 +883,19 @@
           </form>
           ${continueBtn}
           <button class="btn secondary" type="button" data-action="menu-rules">Правила</button>
-          ${save.best ? `<div class="menu-record"><span class="menu-record-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></span><span class="menu-record-label">Рекорд</span><strong class="menu-record-value num">${esc(G.formatScore(save.best))}</strong></div>` : ""}
+          ${recordButton("Рекорд")}
         </div>
       </div>
     </section>`;
     renderPanels();
   }
 
-  function showRoster() {
-    stopSkyLoop();
-    roadObserver?.disconnect();
-    state = null;
-    const places = G.CLINIC_NAMES.map((name) => `<p class="roster-place">${esc(name)}</p>`).join("");
-    const named = {};
-    G.DOCTORS.forEach((doctor) => {
-      named[doctor.id] = { specialty: doctor.specialty };
-    });
-    G.stampRosterNames(named);
-    const cards = G.DOCTORS.map((doctor) => {
-      const spec = G.specialtyOf(doctor.specialty);
-      const { first, last } = nameParts(named[doctor.id].name);
-      return `<article class="roster-card">
-        ${window.MPPortrait(doctor.id)}
-        <p class="who"><span class="first">${esc(first)}</span><span class="last">${esc(last)}</span></p>
-        <p class="spec" style="color:${spec.color}">${esc(spec.label)}</p>
-      </article>`;
-    }).join("");
-    const lines = G.HOBBIES.map((hobby) => `<article class="roster-line"><b>${esc(hobby.label)}</b><span>${esc(hobby.line)}</span></article>`).join("");
-    const general = G.generalNames();
-    const nameChips = (list) => list.map((name) => `<p class="roster-name">${esc(name)}</p>`).join("");
-    setMenuChrome(false);
-    document.getElementById("app").innerHTML = `<section class="start roster">
-      ${soundbarHtml(true)}
-      <p class="eyebrow">Справочник</p>
-      <h1>Врачи и поликлиники</h1>
-      <p class="lead">${G.CLINIC_NAMES.length} лечебных учреждений и ${G.HOBBIES.length} интересов. Каждый день на дорогу попадают пять учреждений, в каждом три врача и три случайных интереса.</p>
-      <p class="block-title">Поликлиники</p>
-      <div class="roster-places">${places}</div>
-      <p class="block-title">Интересы и реплики</p>
-      <div class="roster-lines">${lines}</div>
-      <p class="block-title">Врачи</p>
-      <div class="roster-grid">${cards}</div>
-      <p class="block-title">Общие имена</p>
-      <p class="roster-note">Для любой специальности, кроме невролога, гинеколога, терапевта и хирурга.</p>
-      <p class="roster-kicker">Женщины</p>
-      <div class="roster-names">${nameChips(general.f)}</div>
-      <p class="roster-kicker">Мужчины</p>
-      <div class="roster-names">${nameChips(general.m)}</div>
-      <button class="btn" type="button" data-action="new-day">В меню</button>
-    </section>`;
-  }
-
-  function startGame(name) {
+  async function startGame(name) {
     startMusic();
+    const official = await rememberName(name);
     const save = loadSave();
-    state = freshState(name);
-    save.name = name;
+    state = freshState(official);
+    save.name = official;
     save.game = state;
     writeSave(save);
     showGame(true);
@@ -883,12 +956,22 @@
           </button>
         </div>
       </header>
-      <div class="map-scroll" id="map-scroll">
-        <div class="route" id="route"></div>
+      <div class="map-frame">
+        ${soundbarHtml(false)}
+        <div class="map-scroll" id="map-scroll">
+          <div class="route" id="route"></div>
+        </div>
       </div>
       <div class="overlay" id="overlay" hidden></div>
       <div class="game-corner">
-        ${soundbarHtml(false)}
+        <button type="button" class="portfolio-btn" data-action="open-portfolio">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 8V6.5A2.5 2.5 0 0 1 10.5 4h3A2.5 2.5 0 0 1 16 6.5V8"/>
+            <rect x="4" y="8" width="16" height="12" rx="3"/>
+            <path d="M4 13h16"/>
+          </svg>
+          Портфель
+        </button>
         <aside class="day-end" id="day-end" hidden>
           <button type="button" class="day-end-card" data-action="finish-day">
             <span class="day-end-mark" aria-hidden="true"></span>
@@ -900,14 +983,6 @@
           </button>
         </aside>
       </div>
-      <button type="button" class="portfolio-btn" data-action="open-portfolio">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M8 8V6.5A2.5 2.5 0 0 1 10.5 4h3A2.5 2.5 0 0 1 16 6.5V8"/>
-          <rect x="4" y="8" width="16" height="12" rx="3"/>
-          <path d="M4 13h16"/>
-        </svg>
-        Портфель
-      </button>
       <div class="sr" id="live" aria-live="polite"></div>
     </section>`;
     document.getElementById("route").innerHTML =
@@ -2124,6 +2199,7 @@
       : "";
     overlay.innerHTML = visitSheet + contactSheet;
     paintDoctorBubbles();
+    settleDrugFlow();
   }
 
   function sheetHtml() {
@@ -2379,7 +2455,7 @@
     const drugs = G.DRUGS.map((drug) => {
       const picked = state.selectedDrug === drug.id;
       return `<button type="button" class="drug${picked ? " is-picked" : ""}" data-action="pick-drug" data-drug="${drug.id}" aria-pressed="${picked ? "true" : "false"}">
-        <b>${esc(drug.name)}</b>
+        <b>${esc(drug.name)}<span class="drug-lit" aria-hidden="true">${esc(drug.name)}</span></b>
       </button>`;
     }).join("");
     return `<div class="person">
@@ -2387,12 +2463,11 @@
         <div>
           <p class="eyebrow">Визит</p>
           <h2>${esc(doctor.name)}</h2>
-          <p class="sub">Визит занял 30 минут, осталось ${esc(G.formatDuration(state.minutesLeft))}.</p>
         </div>
       </div>
       ${visitContactHtml(doctor)}
       <p class="block-title">Какой препарат рассказать</p>
-      <div class="drugs">${drugs}</div>
+      <div class="drugs"><span class="drug-flow" aria-hidden="true"></span>${drugs}</div>
       <button type="button" class="btn" data-action="present" ${state.selectedDrug ? "" : "disabled"}>Рассказать о препарате</button>`;
   }
 
@@ -2574,16 +2649,172 @@
     renderOverlay();
   }
 
+  let drugInk = { gen: 0 };
+
+  function drugBox(button) {
+    return {
+      left: button.offsetLeft,
+      top: button.offsetTop,
+      width: button.offsetWidth,
+      height: button.offsetHeight,
+    };
+  }
+
+  function flowBox(flow, grid) {
+    const ink = flow.getBoundingClientRect();
+    const host = grid.getBoundingClientRect();
+    return {
+      left: ink.left - host.left,
+      top: ink.top - host.top,
+      width: ink.width,
+      height: ink.height,
+    };
+  }
+
+  function applyDrugBox(flow, box) {
+    flow.style.left = `${box.left}px`;
+    flow.style.top = `${box.top}px`;
+    flow.style.width = `${box.width}px`;
+    flow.style.height = `${box.height}px`;
+  }
+
+  function drugFrame(box, radius) {
+    return {
+      left: `${box.left}px`,
+      top: `${box.top}px`,
+      width: `${box.width}px`,
+      height: `${box.height}px`,
+      borderRadius: radius,
+    };
+  }
+
+  function bridgeDrugBox(from, to) {
+    const ax = from.left + from.width / 2;
+    const ay = from.top + from.height / 2;
+    const bx = to.left + to.width / 2;
+    const by = to.top + to.height / 2;
+    const dx = Math.abs(bx - ax);
+    const dy = Math.abs(by - ay);
+    const width = (from.width + to.width) / 2 + dx * (dx >= dy ? 1 : 0.4);
+    const height = (from.height + to.height) / 2 + dy * (dy > dx ? 1 : 0.4);
+    return {
+      left: (ax + bx) / 2 - width / 2,
+      top: (ay + by) / 2 - height / 2,
+      width,
+      height,
+    };
+  }
+
+  function clipDrugLit(button, ink) {
+    const lit = button.querySelector(".drug-lit");
+    if (!lit) return;
+    const host = button.parentElement.getBoundingClientRect();
+    const mark = lit.getBoundingClientRect();
+    const box = {
+      left: mark.left - host.left,
+      top: mark.top - host.top,
+      width: mark.width,
+      height: mark.height,
+    };
+    const top = Math.max(0, ink.top - box.top);
+    const left = Math.max(0, ink.left - box.left);
+    const bottom = Math.max(0, box.top + box.height - (ink.top + ink.height));
+    const right = Math.max(0, box.left + box.width - (ink.left + ink.width));
+    lit.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`;
+  }
+
+  function trackDrugLit(grid, flow, anim, gen) {
+    const step = () => {
+      if (gen !== drugInk.gen) return;
+      const ink = flowBox(flow, grid);
+      grid.querySelectorAll("[data-drug]").forEach((button) => clipDrugLit(button, ink));
+      if (anim.playState === "running" || anim.playState === "pending") requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  function finishDrugLit(grid, next) {
+    grid.querySelectorAll("[data-drug]").forEach((button) => {
+      const lit = button.querySelector(".drug-lit");
+      if (lit) lit.style.clipPath = "";
+      button.classList.toggle("is-picked", button === next);
+    });
+  }
+
+  function settleDrugFlow() {
+    const grid = document.querySelector(".overlay .drugs");
+    const flow = grid && grid.querySelector(".drug-flow");
+    if (!grid || !flow || !state?.selectedDrug) return;
+    const next = grid.querySelector(`[data-drug="${CSS.escape(state.selectedDrug)}"]`);
+    if (!next) return;
+    drugInk.gen += 1;
+    flow.getAnimations().forEach((anim) => anim.cancel());
+    applyDrugBox(flow, drugBox(next));
+    flow.classList.add("is-on");
+    finishDrugLit(grid, next);
+  }
+
+  function flowToDrug(grid, next) {
+    const flow = grid.querySelector(".drug-flow");
+    if (!flow) {
+      next.classList.add("is-picked");
+      return;
+    }
+    const target = drugBox(next);
+    const reduce = motionMs(1) === 0;
+    const from = flow.classList.contains("is-on") ? flowBox(flow, grid) : null;
+    flow.getAnimations().forEach((anim) => anim.cancel());
+    const gen = ++drugInk.gen;
+    grid.querySelectorAll("[data-drug]").forEach((button) => button.classList.remove("is-picked"));
+
+    if (reduce) {
+      applyDrugBox(flow, target);
+      flow.classList.add("is-on");
+      finishDrugLit(grid, next);
+      return;
+    }
+
+    const start = from || {
+      left: target.left + target.width * 0.28,
+      top: target.top + target.height * 0.22,
+      width: target.width * 0.44,
+      height: target.height * 0.56,
+    };
+    applyDrugBox(flow, start);
+    flow.classList.add("is-on");
+    const frames = from
+      ? [
+        drugFrame(from, "14px"),
+        { ...drugFrame(bridgeDrugBox(from, target), "22px"), offset: 0.46 },
+        drugFrame(target, "14px"),
+      ]
+      : [drugFrame(start, "14px"), drugFrame(target, "14px")];
+    const anim = flow.animate(frames, {
+      duration: from ? 520 : 280,
+      easing: from ? "cubic-bezier(0.55, 0.05, 0.25, 1)" : "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      fill: "forwards",
+    });
+    trackDrugLit(grid, flow, anim, gen);
+    anim.onfinish = () => {
+      if (gen !== drugInk.gen) return;
+      applyDrugBox(flow, target);
+      anim.cancel();
+      finishDrugLit(grid, next);
+    };
+  }
+
   function pickDrug(id) {
-    if (state.phase !== "visit" || !G.drugById(id)) return;
+    if (state.phase !== "visit" || !G.drugById(id) || state.selectedDrug === id) return;
+    const grid = document.querySelector(".overlay .drugs");
+    const next = grid && grid.querySelector(`[data-drug="${CSS.escape(id)}"]`);
+    if (!next) return;
     state.selectedDrug = id;
-    document.querySelectorAll("[data-drug]").forEach((button) => {
-      const on = button.dataset.drug === id;
-      button.classList.toggle("is-picked", on);
-      button.setAttribute("aria-pressed", on ? "true" : "false");
+    grid.querySelectorAll("[data-drug]").forEach((button) => {
+      button.setAttribute("aria-pressed", button === next ? "true" : "false");
     });
     const present = document.querySelector("[data-action='present']");
     if (present) present.disabled = false;
+    flowToDrug(grid, next);
   }
 
   function learnInterests() {
@@ -2877,6 +3108,7 @@
     save.name = state.name;
     save.game = null;
     writeSave(save);
+    submitResult(state.name, state.score);
     roadObserver?.disconnect();
     state.screen = "summary";
     document.getElementById("app").innerHTML = summaryHtml();
@@ -2916,7 +3148,6 @@
 
   function summaryHtml() {
     const grade = G.grade(state.score);
-    const save = loadSave();
     const tips = coaching();
     const rows = [
       ["Визиты", `${state.visited.length} / ${totalDoctorSlots()}`],
@@ -2929,9 +3160,7 @@
       ["Потеряно на препарате", G.formatScore(lostPoints())],
     );
     const stats = rows.map(([label, value]) => `<li><span>${esc(label)}</span><b class="num">${esc(value)}</b></li>`).join("");
-    const record = save.best
-      ? `<div class="menu-record"><span class="menu-record-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></span><span class="menu-record-label">${summaryBest ? "Новый рекорд" : "Рекорд"}</span><strong class="menu-record-value num">${esc(G.formatScore(save.best))}</strong></div>`
-      : "";
+    const record = recordButton(summaryBest ? "Новый рекорд" : "Рекорд");
     const tipBlock = tips.length
       ? `<p class="summary-kicker">На следующий день</p><ul class="summary-tips">${tips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul>`
       : "";
@@ -2940,14 +3169,6 @@
       : `<p class="summary-empty">Визитов не было.</p>`;
     return `<section class="start menu summary-menu">
       ${menuSceneHtml()}
-      <button type="button" class="menu-roster-btn" data-action="show-roster" aria-label="Справочник" title="Справочник">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/>
-          <circle cx="10" cy="8" r="3.2"/>
-          <path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4"/>
-          <path d="M15.4 5.2a3.2 3.2 0 0 1 0 5.6"/>
-        </svg>
-      </button>
       ${soundbarHtml(true)}
       <div class="menu-shell">
         <header class="menu-title">
@@ -3025,7 +3246,6 @@
       if (menuHomeTaps >= 10) window.location.assign("/admin");
     }
     else if (action === "continue-game") continueGame();
-    else if (action === "show-roster") showRoster();
     else if (action === "select-clinic") selectClinic(button.dataset.id);
     else if (action === "choose-doctor") chooseDoctor(button.dataset.id);
     else if (action === "back-doctors") backToDoctors();
@@ -3059,6 +3279,15 @@
     else if (action === "next-track") nextTrack();
     else if (action === "menu-rules") openRulesModal();
     else if (action === "close-rules") closeRulesModal();
+    else if (action === "open-board") openBoard();
+    else if (action === "close-board") closeBoard();
+    else if (action === "board-tab") {
+      const next = button.dataset.board;
+      if (BOARD_TABS.some((tab) => tab[0] === next)) {
+        boardTab = next;
+        paintBoard();
+      }
+    }
   }
 
   function onSubmit(event) {
@@ -3085,6 +3314,10 @@
       closeRulesModal();
       return;
     }
+    if (event.target.id === "board-modal") {
+      closeBoard();
+      return;
+    }
     if (event.target.id === "overlay") {
       if (contactOpen()) closeContact();
       else if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
@@ -3098,7 +3331,7 @@
     if (event.key === "Escape") {
       if (document.getElementById("portfolio-modal")) closePortfolio();
       else if (document.getElementById("rules-modal")) closeRulesModal();
-      else if (document.querySelector(".roster")) showStart();
+      else if (document.getElementById("board-modal")) closeBoard();
       else if (contactOpen()) closeContact();
       else if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();
       else closeSoft();
