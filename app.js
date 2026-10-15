@@ -474,6 +474,7 @@
     if (!assigned || !G.specialtyOf(assigned.specialty)) return doctor;
     return {
       ...doctor,
+      name: assigned.name || doctor.name,
       specialty: assigned.specialty,
       dislike: assigned.dislike && G.drugById(assigned.dislike) ? assigned.dislike : null,
     };
@@ -487,8 +488,13 @@
       const row = roster[id];
       return row && G.specialtyOf(row.specialty) && (row.dislike == null || G.drugById(row.dislike));
     });
-    if (ok) return false;
-    state.roster = G.assignRoster(ids);
+    if (!ok) {
+      state.roster = G.assignRoster(ids);
+      return true;
+    }
+    const missingName = ids.some((id) => typeof roster[id].name !== "string" || !roster[id].name);
+    if (!missingName) return false;
+    G.stampRosterNames(roster);
     return true;
   }
 
@@ -585,6 +591,45 @@
     return "is-zero";
   }
 
+  function portfolioColumnsHtml() {
+    const catalog = G.currentCatalog();
+    return catalog.drugs.map((drug) => {
+      const rows = catalog.specialties
+        .map((spec, index) => ({ spec, index, rate: catalog.rates[spec.id][drug.id] }))
+        .sort((a, b) => b.rate - a.rate || a.index - b.index);
+      const items = rows.map((row) => `<li class="portfolio-rank ${rateClass(row.rate)}"><span>${esc(row.spec.label)}</span><b>${rateLabel(row.rate)}</b></li>`).join("");
+      return `<section class="portfolio-col"><h3>${esc(drug.name)}</h3><ol>${items}</ol></section>`;
+    }).join("");
+  }
+
+  function openPortfolio() {
+    if (document.getElementById("portfolio-modal")) return;
+    const host = document.querySelector(".game");
+    if (!host) return;
+    const el = document.createElement("div");
+    el.className = "menu-modal";
+    el.id = "portfolio-modal";
+    el.innerHTML = `<div class="menu-modal-card portfolio-card" role="dialog" aria-modal="true" aria-label="Портфель">
+      <div class="menu-modal-head">
+        <h2>Портфель</h2>
+        <button type="button" class="menu-modal-close" data-action="close-portfolio" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <p class="portfolio-note">В каждом столбце сверху специальность, которой препарат даёт больше баллов.</p>
+      <div class="portfolio-board">${portfolioColumnsHtml()}</div>
+    </div>`;
+    host.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("is-open"));
+  }
+
+  function closePortfolio() {
+    const el = document.getElementById("portfolio-modal");
+    if (!el) return;
+    el.classList.remove("is-open");
+    setTimeout(() => el.remove(), 220);
+  }
+
   function portfolioHtml() {
     const catalog = G.currentCatalog();
     const head = catalog.drugs.map((drug) => `<th scope="col">${esc(drug.name)}</th>`).join("");
@@ -643,10 +688,12 @@
       <path d="M-20 574 C240 556 440 592 660 572 C880 552 1040 586 1220 568" fill="none" stroke="#243042" stroke-width="26" stroke-linecap="round"/>
       <path d="M-20 574 C240 556 440 592 660 572 C880 552 1040 586 1220 568" fill="none" stroke="#f3ecdf" stroke-width="2.6" stroke-dasharray="6 18" stroke-linecap="round"/>
       <g class="menu-home" data-action="menu-home" transform="translate(150 526)">
-        <rect x="-10" y="-10" width="88" height="76" fill="transparent"/>
-        <path d="M0 26 L34 0 L68 26 Z" fill="#e14b3c"/>
-        <rect x="10" y="26" width="48" height="30" fill="#f4efe4"/>
-        <rect x="26" y="40" width="16" height="16" rx="1" fill="#6b4a34"/>
+        <g class="menu-home-body">
+          <rect x="-10" y="-10" width="88" height="76" fill="transparent"/>
+          <path d="M0 26 L34 0 L68 26 Z" fill="#e14b3c"/>
+          <rect x="10" y="26" width="48" height="30" fill="#f4efe4"/>
+          <rect x="26" y="40" width="16" height="16" rx="1" fill="#6b4a34"/>
+        </g>
       </g>
       ${clinicSvg(0, "#0f766e").replace("<svg ", '<svg x="937" y="420" width="135" height="158" ')}
     </svg>`;
@@ -680,6 +727,7 @@
   }
 
   let menuHomeTaps = 0;
+  let menuHomeTapTimer = 0;
 
   function showStart() {
     menuHomeTaps = 0;
@@ -731,9 +779,14 @@
     roadObserver?.disconnect();
     state = null;
     const places = G.CLINIC_NAMES.map((name) => `<p class="roster-place">${esc(name)}</p>`).join("");
+    const named = {};
+    G.DOCTORS.forEach((doctor) => {
+      named[doctor.id] = { specialty: doctor.specialty };
+    });
+    G.stampRosterNames(named);
     const cards = G.DOCTORS.map((doctor) => {
       const spec = G.specialtyOf(doctor.specialty);
-      const { first, last } = nameParts(doctor.name);
+      const { first, last } = nameParts(named[doctor.id].name);
       return `<article class="roster-card">
         ${window.MPPortrait(doctor.id)}
         <p class="who"><span class="first">${esc(first)}</span><span class="last">${esc(last)}</span></p>
@@ -741,6 +794,8 @@
       </article>`;
     }).join("");
     const lines = G.HOBBIES.map((hobby) => `<article class="roster-line"><b>${esc(hobby.label)}</b><span>${esc(hobby.line)}</span></article>`).join("");
+    const general = G.generalNames();
+    const nameChips = (list) => list.map((name) => `<p class="roster-name">${esc(name)}</p>`).join("");
     setMenuChrome(false);
     document.getElementById("app").innerHTML = `<section class="start roster">
       ${soundbarHtml(true)}
@@ -753,6 +808,12 @@
       <div class="roster-lines">${lines}</div>
       <p class="block-title">Врачи</p>
       <div class="roster-grid">${cards}</div>
+      <p class="block-title">Общие имена</p>
+      <p class="roster-note">Для любой специальности, кроме невролога, гинеколога, терапевта и хирурга.</p>
+      <p class="roster-kicker">Женщины</p>
+      <div class="roster-names">${nameChips(general.f)}</div>
+      <p class="roster-kicker">Мужчины</p>
+      <div class="roster-names">${nameChips(general.m)}</div>
       <button class="btn" type="button" data-action="new-day">В меню</button>
     </section>`;
   }
@@ -839,6 +900,14 @@
           </button>
         </aside>
       </div>
+      <button type="button" class="portfolio-btn" data-action="open-portfolio">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 8V6.5A2.5 2.5 0 0 1 10.5 4h3A2.5 2.5 0 0 1 16 6.5V8"/>
+          <rect x="4" y="8" width="16" height="12" rx="3"/>
+          <path d="M4 13h16"/>
+        </svg>
+        Портфель
+      </button>
       <div class="sr" id="live" aria-live="polite"></div>
     </section>`;
     document.getElementById("route").innerHTML =
@@ -2047,8 +2116,9 @@
     }
     overlay.hidden = false;
     const contact = contactOpen();
+    const picking = state.phase === "confirm" && state.position === state.selectedClinic && !state.selectedDoctor;
     overlay.classList.toggle("has-contact", contact);
-    const visitSheet = `<div class="sheet${contact ? " is-behind" : ""}" role="dialog"${contact ? "" : ' aria-modal="true"'}>${sheetHtml()}</div>`;
+    const visitSheet = `<div class="sheet${picking ? " is-pick" : ""}${contact ? " is-behind" : ""}" role="dialog"${contact ? "" : ' aria-modal="true"'}>${sheetHtml()}</div>`;
     const contactSheet = contact
       ? `<div class="sheet contact-sheet" role="dialog" aria-modal="true">${contactDialogHtml()}</div>`
       : "";
@@ -2073,7 +2143,7 @@
 
   function tripHtml(clinic) {
     const travel = G.travelMinutes(state.route, state.position, clinic.anchor);
-    return `<p class="eyebrow">${esc(clinic.title)}</p>
+    return `<p class="eyebrow clinic-name">${esc(clinic.title)}</p>
       <h2>В путь</h2>
       <ul class="outcomes trip-facts">
         <li><span>В пути</span><b class="num">${esc(G.formatDuration(travel))}</b></li>
@@ -2095,24 +2165,8 @@
         <span class="spec">${seen ? "Уже были" : esc(spec.label)}</span>
       </button>`;
     }).join("");
-    const rates = G.usedRates().map((rate) => {
-      const value = esc(G.formatScore(G.pointsAt(clinic.points, rate)));
-      return `<li class="${rateClass(rate)}"><b class="num">${value}</b><span>${rateLabel(rate)}</span></li>`;
-    }).join("");
-    return `<p class="eyebrow">${esc(clinic.title)}</p>
+    return `<p class="eyebrow clinic-name">${esc(clinic.title)}</p>
       <h2>Кого посетить</h2>
-      <p class="clock-note">На визит — 30 минут.</p>
-      <div class="payoff">
-        <ul class="payoff-rows">${rates}</ul>
-        <p class="payoff-note">Если врач не назначает препарат — 0 баллов.</p>
-        <div class="payoff-talk">
-          <p class="payoff-kicker">Занимательная беседа по интересам</p>
-          <div class="payoff-pair">
-            <p class="is-up"><b>×2</b><span>если попали в интересы</span></p>
-            <p class="is-down"><b>½</b><span>если врачу не интересно</span></p>
-          </div>
-        </div>
-      </div>
       <div class="doctor-pick">${cards}</div>
       ${hasMove() ? "" : dayEndCardHtml()}
       <button type="button" class="btn secondary" data-action="cancel">Уехать дальше</button>`;
@@ -2130,14 +2184,10 @@
     const { first, last } = nameParts(doctor.name);
     const total = G.VISIT_MINUTES;
     const canEnter = state.minutesLeft >= total;
-    const left = Math.max(0, state.minutesLeft - total);
     const known = interestsKnown(doctor.id);
     const canScout = canScoutNow();
     const scout = known ? interestChips(doctor.id) : "";
     const stuck = !hasMove();
-    const timeNote = canEnter
-      ? `На визит — 30 минут. Останется ${G.formatDuration(left)}.`
-      : `На визит — 30 минут. Сейчас осталось ${G.formatDuration(state.minutesLeft)}.`;
     const scoutTime = esc(G.formatDuration(G.INTEREST_MINUTES));
     const visitTime = esc(G.formatDuration(total));
     const learn = known || !canScout
@@ -2147,8 +2197,7 @@
       ? ""
       : `<button type="button" class="btn btn-split" data-action="depart"${canEnter ? "" : " disabled"}><span class="btn-title">Визит</span><span class="btn-time">${visitTime}</span></button>`;
     const end = stuck ? dayEndCardHtml() : "";
-    return `<p class="eyebrow">${esc(clinic.title)}</p>
-      <p class="clock-note">${esc(timeNote)}</p>
+    return `<p class="eyebrow clinic-name">${esc(clinic.title)}</p>
       <div class="doctor-card">
         ${window.MPPortrait(doctor.id)}
         <div>
@@ -2156,12 +2205,7 @@
           <p class="spec" style="--spec:${spec.color}">${esc(spec.label)}</p>
         </div>
       </div>
-      ${dislike ? `<p class="gold-banner">Не назначает <b>${esc(dislike.name)}</b>.</p>` : `<p class="gold-chip">Назначает любой препарат из портфеля.</p>`}
-      <ul class="drug-rates">${G.DRUGS.map((drug) => {
-        const scored = G.scoreVisit(doctor, drug.id);
-        const note = scored.outcome === "dislike" ? "не назначает" : rateLabel(scored.rate);
-        return `<li class="${rateClass(scored.outcome === "dislike" ? 0 : scored.rate)}"><span>${esc(drug.name)}</span><b class="num">${esc(G.formatScore(scored.points))}</b><small>${note}</small></li>`;
-      }).join("")}</ul>
+      ${dislike ? `<p class="gold-banner">Не назначает <b>${esc(dislike.name)}</b>.<small>за выбор данного препарата — 0 баллов</small></p>` : `<p class="gold-chip">Назначает любой препарат из портфеля.</p>`}
       ${scout}
       <div class="stack">
         ${learn ? `<div class="action-row">${learn}${enter}</div>` : enter}
@@ -2323,18 +2367,19 @@
     }).join("");
     return `${contactFaceHtml(doctor)}
       <p class="contact-name"><span>${esc(first)}</span> <span>${esc(last)}</span></p>
+      <div class="payoff-pair">
+        <p class="is-up"><b>×2</b><span>если попали в интересы</span></p>
+        <p class="is-down"><b>½</b><span>если врачу не интересно</span></p>
+      </div>
       <div class="replies">${buttons}</div>`;
   }
 
   function visitHtml() {
     const doctor = dayDoctor(state.focusDoctor);
-    const tone = { full: "#176b32", half: "#8a4e08", quarter: "#3451a3", none: "#9a3412", dislike: "#9a3412" };
     const drugs = G.DRUGS.map((drug) => {
-      const scored = G.scoreVisit(doctor, drug.id);
       const picked = state.selectedDrug === drug.id;
-      const note = scored.outcome === "dislike" ? "не назначает" : rateLabel(scored.rate);
-      return `<button type="button" class="drug${picked ? " is-picked" : ""}" style="--spec:${tone[scored.outcome]}" data-action="pick-drug" data-drug="${drug.id}" aria-pressed="${picked ? "true" : "false"}">
-        <b>${esc(drug.name)}</b><small>${note} · ${esc(G.formatScore(scored.points))}</small>
+      return `<button type="button" class="drug${picked ? " is-picked" : ""}" data-action="pick-drug" data-drug="${drug.id}" aria-pressed="${picked ? "true" : "false"}">
+        <b>${esc(drug.name)}</b>
       </button>`;
     }).join("");
     return `<div class="person">
@@ -2568,14 +2613,6 @@
     if (!row || !scout || !enter || !stack) {
       renderOverlay();
       return;
-    }
-    const note = sheet.querySelector(".clock-note");
-    if (note) {
-      const total = G.VISIT_MINUTES;
-      const left = Math.max(0, state.minutesLeft - total);
-      note.textContent = state.minutesLeft >= total
-        ? `На визит — 30 минут. Останется ${G.formatDuration(left)}.`
-        : `На визит — 30 минут. Сейчас осталось ${G.formatDuration(state.minutesLeft)}.`;
     }
     if (state.minutesLeft < G.VISIT_MINUTES) enter.disabled = true;
 
@@ -2976,9 +3013,16 @@
     const button = event.target.closest("[data-action]");
     if (!button || button.disabled) return;
     const action = button.dataset.action;
-    if (action === "menu-home") {
+    if (action === "open-portfolio") openPortfolio();
+    else if (action === "close-portfolio") closePortfolio();
+    else if (action === "menu-home") {
+      button.classList.remove("is-tap");
+      void button.getBoundingClientRect();
+      button.classList.add("is-tap");
+      clearTimeout(menuHomeTapTimer);
+      menuHomeTapTimer = setTimeout(() => button.classList.remove("is-tap"), 920);
       menuHomeTaps += 1;
-      if (menuHomeTaps >= 10) window.location.assign("/admin.html");
+      if (menuHomeTaps >= 10) window.location.assign("/admin");
     }
     else if (action === "continue-game") continueGame();
     else if (action === "show-roster") showRoster();
@@ -3033,6 +3077,10 @@
   }
 
   document.getElementById("app").addEventListener("click", (event) => {
+    if (event.target.id === "portfolio-modal") {
+      closePortfolio();
+      return;
+    }
     if (event.target.id === "rules-modal") {
       closeRulesModal();
       return;
@@ -3048,7 +3096,8 @@
   document.getElementById("app").addEventListener("submit", onSubmit);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      if (document.getElementById("rules-modal")) closeRulesModal();
+      if (document.getElementById("portfolio-modal")) closePortfolio();
+      else if (document.getElementById("rules-modal")) closeRulesModal();
       else if (document.querySelector(".roster")) showStart();
       else if (contactOpen()) closeContact();
       else if (state?.phase === "confirm" && state.selectedDoctor) backToDoctors();

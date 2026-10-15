@@ -62,6 +62,117 @@
     DOCTORS.filter((doctor) => doctor.dislike).map((doctor) => doctor.id)
   );
 
+  function namesOf(specialty, female) {
+    return DOCTORS
+      .filter((doctor) => doctor.specialty === specialty && doctor.female === female)
+      .map((doctor) => doctor.name);
+  }
+
+  const NAME_POOLS = {
+    therapist: { f: namesOf("therapist", true), m: namesOf("therapist", false) },
+    gynecologist: { f: namesOf("gynecologist", true), m: namesOf("gynecologist", false).concat(["Фолликул Циклов"]) },
+    neurologist: { f: namesOf("neurologist", true), m: namesOf("neurologist", false).concat(["Синапс Рефлексов"]) },
+    surgeon: {
+      f: namesOf("surgeon", true).concat(["Повязка Стерильна", "Кетгут Прочная", "Шовчик Аккуратна"]),
+      m: namesOf("surgeon", false),
+    },
+    general: {
+      f: [
+        "Дозировка Точнова",
+        "Процедура Бережнова",
+        "Анамнезка Подробнова",
+        "Пальпация Мягкова",
+        "Перкуссия Звонкова",
+        "Аускультация Яснова",
+        "Медкарта Полнова",
+        "Выписка Эпикризова",
+        "Диспансеризация Годова",
+        "Схема Лечебнова",
+        "Ампула Стеклянова",
+        "Мензурка Мернова",
+        "Мазь Целебнова",
+        "Доза Расчётнова",
+        "Протокол Заполнова",
+        "Маска Марлева",
+      ],
+      m: [
+        "Фонендоскоп Трубков",
+        "Халат Крахмалев",
+        "Тонометр Манжетнов",
+        "Шприц Одноразов",
+        "Диагноз Рабочев",
+        "Синдром Типичнов",
+        "Симптом Ведущев",
+        "Заключение Обоснованов",
+        "Консилиум Согласнов",
+        "Обход Утреннев",
+        "Дежурство Ночнов",
+        "Стационар Планов",
+        "Результат Лабораторнов",
+        "Направление Профильнов",
+        "Журнал Назначений",
+        "Жгут Венознов",
+        "Штатив Инфузионнов",
+        "Пузырь Согревов",
+      ],
+    },
+  };
+
+  function specialtyNameKey(label) {
+    const text = cleanLabel(label).toLowerCase().replace(/ё/g, "е");
+    if (text === "невролог") return "neurologist";
+    if (text === "гинеколог") return "gynecologist";
+    if (text === "хирург") return "surgeon";
+    if (text === "терапевт" || text === "воп" || text === "врач общей практики") return "therapist";
+    return "general";
+  }
+
+  function nameIsFemale(name) {
+    const last = String(name || "").trim().split(/\s+/).pop().toLowerCase().replace(/ё/g, "е");
+    return /[ая]$/.test(last);
+  }
+
+  function stampRosterNames(roster) {
+    const groups = new Map();
+    Object.keys(roster).forEach((key) => {
+      const id = Number(key);
+      const doctor = doctorById(id);
+      const row = roster[key];
+      if (!doctor || !row) return;
+      const spec = specialtyOf(row.specialty);
+      const poolKey = specialtyNameKey(spec ? spec.label : "");
+      const groupKey = `${poolKey}:${doctor.female ? "f" : "m"}`;
+      if (!groups.has(groupKey)) groups.set(groupKey, []);
+      groups.get(groupKey).push(id);
+    });
+    const used = new Set();
+    const ordered = [...groups.entries()].sort((a, b) => {
+      const rank = (groupKey) => (groupKey.startsWith("general:") ? 1 : 0);
+      return rank(a[0]) - rank(b[0]);
+    });
+    ordered.forEach(([groupKey, ids]) => {
+      const split = groupKey.indexOf(":");
+      const gender = groupKey.slice(split + 1);
+      const pool = NAME_POOLS[groupKey.slice(0, split)][gender];
+      const spare = NAME_POOLS.general[gender];
+      ids.sort((a, b) => a - b);
+      ids.forEach((id) => {
+        const wantFemale = gender === "f";
+        const name = [...pool, ...spare].find((candidate) => !used.has(candidate) && nameIsFemale(candidate) === wantFemale);
+        used.add(name);
+        roster[id].name = name;
+      });
+    });
+    return roster;
+  }
+
+  function generalNames() {
+    return {
+      f: NAME_POOLS.general.f.slice(),
+      m: NAME_POOLS.general.m.slice(),
+    };
+  }
+
   function cleanLabel(value) {
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, 40);
   }
@@ -494,7 +605,7 @@
       }
       roster[id] = { specialty, dislike };
     });
-    return roster;
+    return stampRosterNames(roster);
   }
 
   function scoreVisit(doctor, drugId) {
@@ -637,7 +748,73 @@
     const seeded = assignRoster([1, 2, 3, 4, 5], () => 0);
     if (seeded[1].specialty !== "gynecologist" || seeded[1].dislike !== null) errors.push("roster open");
     if (seeded[2].specialty !== "neurologist" || seeded[2].dislike !== "teralin") errors.push("roster dislike");
+    if (seeded[1].name !== "Узика Скринингова") errors.push("roster gyn name");
+    if (!NAME_POOLS.neurologist.m.includes(seeded[2].name)) errors.push("roster neuro name");
     if (Object.keys(assignRoster([1, 2, 3], () => 0.5)).length !== 3) errors.push("roster size");
+
+    const pinned = {};
+    DOCTORS.forEach((doctor) => {
+      pinned[doctor.id] = { specialty: doctor.specialty };
+    });
+    stampRosterNames(pinned);
+    DOCTORS.forEach((doctor) => {
+      if (pinned[doctor.id].name !== doctor.name) errors.push(`pinned name ${doctor.id}`);
+    });
+    const poolNames = [];
+    Object.keys(NAME_POOLS).forEach((key) => {
+      poolNames.push(...NAME_POOLS[key].f, ...NAME_POOLS[key].m);
+    });
+    if (new Set(poolNames).size !== poolNames.length) errors.push("pool names");
+    Object.keys(NAME_POOLS).forEach((key) => {
+      NAME_POOLS[key].f.forEach((name) => {
+        if (!nameIsFemale(name)) errors.push(`female pool ${name}`);
+      });
+      NAME_POOLS[key].m.forEach((name) => {
+        if (nameIsFemale(name)) errors.push(`male pool ${name}`);
+      });
+    });
+    if (NAME_POOLS.general.f.length < 13 || NAME_POOLS.general.m.length < 15) errors.push("general pool");
+    const nameRoot = (word) => word.toLowerCase().replace(/ё/g, "е").replace(/(ова|ева|ина|ая|ов|ев|ин)$/g, "");
+    const femaleRoots = NAME_POOLS.general.f.flatMap((name) => name.split(" ").map(nameRoot));
+    const maleRoots = new Set(NAME_POOLS.general.m.flatMap((name) => name.split(" ").map(nameRoot)));
+    femaleRoots.forEach((root) => {
+      if (root && maleRoots.has(root)) errors.push(`general overlap ${root}`);
+    });
+    ["therapist", "gynecologist", "neurologist", "surgeon"].forEach((key) => {
+      if (NAME_POOLS[key].f.length < 4 || NAME_POOLS[key].m.length < 4) errors.push(`pool ${key}`);
+    });
+
+    const dayRoster = assignRoster(pickedIds, () => 0);
+    const dayNames = pickedIds.map((id) => dayRoster[id].name);
+    if (dayNames.some((name) => !name) || new Set(dayNames).size !== dayNames.length) errors.push("day names");
+    pickedIds.forEach((id) => {
+      const doctor = doctorById(id);
+      const spec = specialtyOf(dayRoster[id].specialty);
+      const pool = NAME_POOLS[specialtyNameKey(spec.label)][doctor.female ? "f" : "m"];
+      if (!pool.includes(dayRoster[id].name)) errors.push(`day name ${id}`);
+    });
+
+    const aliasCatalog = defaultCatalog();
+    aliasCatalog.specialties[0].label = "Врач общей практики";
+    aliasCatalog.specialties[1].label = "ВОП";
+    aliasCatalog.specialties[2].label = "Председатель ЖЭКа";
+    if (!applyCatalog(aliasCatalog)) errors.push("alias catalog");
+    const alias = {};
+    DOCTORS.forEach((doctor) => {
+      alias[doctor.id] = { specialty: doctor.specialty };
+    });
+    stampRosterNames(alias);
+    const aliasNames = DOCTORS.map((doctor) => alias[doctor.id].name);
+    if (aliasNames.some((name) => !name) || new Set(aliasNames).size !== aliasNames.length) errors.push("alias names");
+    if (alias[1].name !== "Капелька Пульсова") errors.push("alias therapist");
+    DOCTORS.filter((doctor) => doctor.specialty === "neurologist").forEach((doctor) => {
+      const pool = NAME_POOLS.general[doctor.female ? "f" : "m"];
+      if (!pool.includes(alias[doctor.id].name)) errors.push(`general name ${doctor.id}`);
+    });
+    DOCTORS.filter((doctor) => doctor.specialty === "surgeon").forEach((doctor) => {
+      if (alias[doctor.id].name !== doctor.name) errors.push(`alias surgeon ${doctor.id}`);
+    });
+    if (!applyCatalog(defaultCatalog())) errors.push("restore catalog");
 
     DOCTORS.forEach((doctor) => {
       if (!SPECIALTIES[doctor.specialty]) errors.push(`specialty ${doctor.id}`);
@@ -731,6 +908,8 @@
     usedRates,
     pointsAt,
     assignRoster,
+    stampRosterNames,
+    generalNames,
     rateOf,
     CLINIC_NAMES,
     HOBBIES,

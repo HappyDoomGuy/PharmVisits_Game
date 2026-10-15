@@ -115,6 +115,32 @@ button:disabled { cursor: default; }
   z-index: 0;
 }
 .menu-home { cursor: pointer; }
+.menu-home-body {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.menu-home:hover .menu-home-body {
+  animation: menu-home-pulse 0.85s ease-in-out infinite;
+}
+.menu-home:active .menu-home-body,
+.menu-home.is-tap .menu-home-body {
+  animation: menu-home-pulse 0.42s ease-in-out 2;
+}
+@keyframes menu-home-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(225, 75, 60, 0));
+  }
+  50% {
+    transform: scale(1.18);
+    filter: drop-shadow(0 0 7px rgba(225, 75, 60, 0.7));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-home:hover .menu-home-body,
+  .menu-home:active .menu-home-body,
+  .menu-home.is-tap .menu-home-body { animation: none; }
+}
 
 .menu-roster-btn {
   position: absolute;
@@ -421,6 +447,10 @@ button:disabled { cursor: default; }
   letter-spacing: 0.04em;
   line-height: 1.35;
 }
+.sheet .clinic-name {
+  font-size: 16px;
+  letter-spacing: 0.03em;
+}
 
 h1, h2, .score-pill strong, .result-points, .stamp {
   font-family: Unbounded, Manrope, sans-serif;
@@ -597,6 +627,36 @@ h1 {
 }
 .roster-card .portrait { border-radius: 14px; }
 .roster-card .spec { margin: 4px 0 0; }
+.roster-note {
+  margin: -6px 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.roster-kicker {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.roster-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+.roster-name {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 800;
+}
 .roster .btn { margin-top: 4px; }
 
 .fine { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 14px 0 0; }
@@ -1186,6 +1246,23 @@ h1 {
   gap: 8px;
   margin: 4px 0 12px;
 }
+.sheet.is-pick {
+  padding: 28px 28px 26px;
+}
+.sheet.is-pick .clinic-name {
+  margin-bottom: 14px;
+}
+.sheet.is-pick h2 {
+  margin-bottom: 22px;
+}
+.sheet.is-pick .doctor-pick {
+  gap: 14px;
+  margin: 0 0 22px;
+}
+.sheet.is-pick .doctor-choice {
+  gap: 10px;
+  padding: 14px 10px 16px;
+}
 .doctor-choice {
   display: flex;
   flex-direction: column;
@@ -1286,6 +1363,77 @@ h1 {
 .game-corner .soundbar {
   background: rgba(255, 253, 248, 0.94);
   box-shadow: inset 0 0 0 1px rgba(36, 48, 66, 0.1), 0 8px 18px rgba(30, 36, 48, 0.16);
+}
+.portfolio-btn {
+  position: absolute;
+  z-index: 6;
+  left: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 14px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.94);
+  color: var(--ink);
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(36, 48, 66, 0.1), 0 8px 18px rgba(30, 36, 48, 0.16);
+}
+.portfolio-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.portfolio-btn:hover { background: #fff; }
+.portfolio-card { width: min(760px, 100%); }
+.portfolio-note {
+  margin: -6px 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.portfolio-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.portfolio-col h3 {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 15px;
+  letter-spacing: -0.03em;
+}
+.portfolio-col ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.portfolio-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 52px;
+  padding: 8px 8px 7px;
+  border-radius: 12px;
+}
+.portfolio-rank span { font-size: 12px; font-weight: 800; line-height: 1.2; }
+.portfolio-rank b { font-size: 11px; font-weight: 800; opacity: 0.82; }
+.portfolio-rank.is-full { color: #176b32; background: #e5f6e4; }
+.portfolio-rank.is-half { color: #8a5a10; background: #fff1c9; }
+.portfolio-rank.is-quarter { color: #c2410c; background: #ffe0c2; }
+.portfolio-rank.is-zero { color: #b42318; background: #ffd5d0; }
+@media (max-width: 720px) {
+  .portfolio-board { grid-template-columns: 1fr 1fr; }
 }
 .day-end-card {
   width: 100%;
@@ -1613,9 +1761,11 @@ h1 {
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.05;
+  white-space: nowrap;
 }
-.contact-name span { display: block; }
+.contact-name span { display: inline; }
 .contact-sheet .replies { margin-top: 2px; text-align: left; }
+.contact-sheet .payoff-pair { margin: 0 0 12px; }
 .contact-sheet .btn { margin-top: 14px; }
 .player-line {
   margin: 0 0 10px;
@@ -1731,6 +1881,13 @@ h1 {
   animation: gold-banner-flow 5.5s ease-in-out infinite;
 }
 .gold-banner b { font-weight: 800; }
+.gold-banner small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
 @keyframes gold-banner-flow {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -1743,88 +1900,6 @@ h1 {
   background: #fff;
   box-shadow: inset 0 0 0 1.5px rgba(30, 36, 48, 0.08), 0 10px 22px rgba(36, 48, 66, 0.06);
 }
-.payoff-rows {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.payoff-rows li {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-height: 78px;
-  margin: 0;
-  padding: 10px 8px 9px;
-  border-radius: 14px;
-  text-align: center;
-}
-.payoff-rows b {
-  font-family: Unbounded, Manrope, sans-serif;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-.payoff-rows span {
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-}
-.payoff-rows .is-full {
-  color: #176b32;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 46%), linear-gradient(180deg, #f3ffe8, #dff6d8);
-}
-.payoff-rows .is-half {
-  color: #8a4e08;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 46%), linear-gradient(180deg, #fff8e8, #ffe8bf);
-}
-.payoff-rows .is-quarter {
-  color: #3451a3;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 46%), linear-gradient(180deg, #f3f6ff, #dce6ff);
-}
-.payoff-rows .is-zero {
-  color: #9a3412;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 46%), linear-gradient(180deg, #fff4f0, #ffd9cf);
-}
-.payoff-note {
-  margin: 8px 4px 2px;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 800;
-  color: #9a3412;
-}
-.drug-rates {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin: 0 0 10px;
-  padding: 0;
-  list-style: none;
-}
-.drug-rates li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas: "name pts" "note pts";
-  gap: 2px 8px;
-  align-items: center;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: inset 0 0 0 1px rgba(36, 48, 66, 0.08);
-}
-.drug-rates span { grid-area: name; font-size: 13px; font-weight: 800; }
-.drug-rates small { grid-area: note; font-size: 11px; font-weight: 700; color: var(--muted); }
-.drug-rates b { grid-area: pts; font-family: Unbounded, Manrope, sans-serif; font-size: 16px; }
-.drug-rates .is-full b { color: #176b32; }
-.drug-rates .is-half b { color: #8a4e08; }
-.drug-rates .is-quarter b { color: #3451a3; }
-.drug-rates .is-zero b { color: #9a3412; }
 .matrix-wrap { overflow-x: auto; margin-top: 4px; }
 .matrix {
   width: 100%;
@@ -1891,17 +1966,6 @@ h1 {
 .payoff-pair .is-down { color: #9a3412; background: #fff1ec; }
 .payoff-pair .is-down b { color: #fff7f4; background: #c2412d; }
 @media (max-width: 440px) {
-  .payoff-rows { grid-template-columns: 1fr; }
-  .payoff-rows li {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    min-height: 46px;
-    padding: 8px 12px;
-    text-align: left;
-  }
-  .payoff-rows b { order: 1; font-size: 18px; }
-  .payoff-rows span { font-size: 13px; }
   .payoff-pair { grid-template-columns: 1fr; }
 }
 .outcomes { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
@@ -1914,8 +1978,9 @@ h1 {
   position: relative;
   text-align: left;
   border: 1.5px solid var(--line);
+  border-left: 1.5px solid var(--line);
   box-shadow: none;
-  min-height: 72px;
+  min-height: 48px;
   background: white;
 }
 .drug b { display: block; font-size: 15px; }

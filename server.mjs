@@ -79,7 +79,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   const decoded = decodeURIComponent(url.pathname);
-  let file = path.normalize(path.join(root, decoded));
+  if (decoded === "/admin/" || decoded === "/admin.html") {
+    res.writeHead(302, { location: "/admin" });
+    res.end();
+    return;
+  }
+  let file = path.normalize(path.join(root, decoded === "/admin" ? "admin.html" : decoded));
   const relative = path.relative(root, file);
   const hidden = relative.split(path.sep).some((part) => part.startsWith("."));
   if (relative.startsWith("..") || path.isAbsolute(relative) || hidden) {
