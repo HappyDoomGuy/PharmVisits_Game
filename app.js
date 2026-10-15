@@ -758,13 +758,41 @@
     return G.formatScore(value);
   }
 
+  function boardCup() {
+    return `<svg class="cup" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="M7.2 2.2h9.6c.3 0 .5.2.5.5v2.1c0 3.1-2.1 5.5-4.8 6-2.7-.5-4.8-2.9-4.8-6V2.7c0-.3.2-.5.5-.5z"/>
+      <path fill="#fff" fill-opacity=".62" d="M8.5 3.2h1.7v5.4c-1-.6-1.6-1.8-1.7-3.4V3.2z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M7.2 4.1H5.2c-1 0-1.6 1-1.3 1.9.3.8 1.2 1.3 2.1 1"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M16.8 4.1h2c1 0 1.6 1 1.3 1.9-.3.8-1.2 1.3-2.1 1"/>
+      <rect fill="currentColor" x="10.6" y="11" width="2.8" height="2.4" rx=".4"/>
+      <path fill="currentColor" d="M7 14.1h10c.5 0 .8.5.6 1l-.6 1.4c-.1.3-.4.5-.7.5H7.7c-.3 0-.6-.2-.7-.5l-.6-1.4c-.2-.5.1-1 .6-1z"/>
+      <path fill="currentColor" d="M6.2 17.4h11.6c.4 0 .7.4.5.8l-.3.8c-.1.2-.3.3-.5.3H6.5c-.2 0-.4-.1-.5-.3l-.3-.8c-.2-.4.1-.8.5-.8z"/>
+    </svg>`;
+  }
+
+  function boardRideHtml() {
+    return `<div class="board-loading" role="status">
+      <div class="board-ride" aria-hidden="true">
+        <span class="board-ride-sun"></span>
+        <span class="board-ride-cloud"></span>
+        <span class="board-ride-home"></span>
+        <span class="board-ride-clinic"></span>
+        <div class="board-ride-road">
+          <span class="board-ride-scale"></span>
+          <span class="board-ride-car">${carSvg()}</span>
+        </div>
+      </div>
+      <p class="board-loading-label">Загрузка</p>
+    </div>`;
+  }
+
   function boardListHtml() {
-    if (!boardData) return `<p class="board-empty">Собираем таблицу…</p>`;
+    if (!boardData) return boardRideHtml();
     if (boardData.error) return `<p class="board-empty">${esc(boardData.error)}</p>`;
     const rows = boardData[boardTab] || [];
     if (!rows.length) return `<p class="board-empty">Пока нет завершённых дней.</p>`;
     return `<ol class="board-list">${rows.map((row) => `<li class="${row.rank <= 3 ? `is-${row.rank}` : ""}${row.you ? " is-you" : ""}">
-      <span class="rank">${row.rank}</span>
+      <span class="rank">${row.rank <= 3 ? boardCup() : row.rank}</span>
       <span class="who">${esc(row.name)}${row.you ? "<i>вы</i>" : ""}</span>
       <span class="val num">${esc(boardValue(boardTab, row.value))}</span>
     </li>`).join("")}</ol>`;
@@ -775,15 +803,23 @@
     if (!card) return;
     const note = BOARD_TABS.find((tab) => tab[0] === boardTab);
     const tabs = BOARD_TABS.map(([id, label]) => `<button type="button" class="${id === boardTab ? "is-on" : ""}" data-action="board-tab" data-board="${id}" role="tab" aria-selected="${id === boardTab ? "true" : "false"}">${label}</button>`).join("");
-    card.innerHTML = `<div class="menu-modal-head">
-        <h2>Рекорд</h2>
-        <button type="button" class="menu-modal-close" data-action="close-board" aria-label="Закрыть">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
+    card.innerHTML = `<div class="board-sheet">
+        <div class="board-sky">
+          <span class="board-sun" aria-hidden="true"></span>
+          <span class="board-cloud" aria-hidden="true"></span>
+          <div class="menu-modal-head board-head">
+            <h2>Рекорд</h2>
+            <button type="button" class="menu-modal-close" data-action="close-board" aria-label="Закрыть">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="board-body">
+          <p class="board-note">${esc(note[2])}</p>
+          <div class="board-scroll">${boardListHtml()}</div>
+        </div>
       </div>
-      <div class="board-tabs" role="tablist">${tabs}</div>
-      <p class="board-note">${esc(note[2])}</p>
-      ${boardListHtml()}`;
+      <div class="board-marks" role="tablist" aria-label="Раздел таблицы">${tabs}</div>`;
   }
 
   function openBoard() {
@@ -792,7 +828,7 @@
     const el = document.createElement("div");
     el.className = "menu-modal";
     el.id = "board-modal";
-    el.innerHTML = `<div class="menu-modal-card" role="dialog" aria-modal="true" aria-label="Рекорд"></div>`;
+    el.innerHTML = `<div class="menu-modal-card board-card" role="dialog" aria-modal="true" aria-label="Рекорд"></div>`;
     document.getElementById("app").appendChild(el);
     paintBoard();
     requestAnimationFrame(() => el.classList.add("is-open"));
@@ -833,19 +869,52 @@
   }
 
   function submitResult(name, score) {
-    fetch("/api/results", {
+    return fetch("/api/results", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name, score: Math.round(score), playerId: playerId() }),
     }).catch(() => {});
   }
 
+  let remoteBest = null;
+
+  function playerBestFromBoard(data) {
+    const rows = data && Array.isArray(data.points) ? data.points : null;
+    if (!rows) return null;
+    const mine = rows.find((row) => row.you);
+    return mine ? Number(mine.value) || 0 : 0;
+  }
+
+  function recordText() {
+    return remoteBest ? G.formatScore(remoteBest) : "—";
+  }
+
+  async function loadRemoteBest() {
+    try {
+      const response = await fetch(`/api/results?player=${encodeURIComponent(playerId())}`, { cache: "no-store" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data) return remoteBest;
+      const best = playerBestFromBoard(data);
+      if (best != null) remoteBest = best;
+    } catch (error) {}
+    return remoteBest;
+  }
+
+  function paintRecordPlaque(label) {
+    const button = document.querySelector(".menu-record");
+    if (!button) return;
+    const value = button.querySelector(".menu-record-value");
+    if (value) value.textContent = recordText();
+    if (!label) return;
+    const node = button.querySelector(".menu-record-label");
+    if (node) node.textContent = label;
+  }
+
   let menuHomeTaps = 0;
   let menuHomeTapTimer = 0;
 
   function recordButton(label) {
-    const save = loadSave();
-    const value = save.best ? G.formatScore(save.best) : "—";
+    const value = recordText();
     return `<button type="button" class="menu-record" data-action="open-board">
       <span class="menu-record-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></span>
       <span class="menu-record-label">${esc(label)}</span>
@@ -888,6 +957,7 @@
       </div>
     </section>`;
     renderPanels();
+    loadRemoteBest().then(() => paintRecordPlaque());
   }
 
   async function startGame(name) {
@@ -3103,12 +3173,21 @@
     stopSkyLoop();
     setMenuChrome(true);
     const save = loadSave();
-    summaryBest = state.score > (save.best || 0);
-    save.best = Math.max(save.best || 0, state.score);
-    save.name = state.name;
+    const dayScore = state.score;
+    const dayName = state.name;
+    summaryBest = remoteBest != null && dayScore > remoteBest;
+    save.best = Math.max(save.best || 0, dayScore);
+    save.name = dayName;
     save.game = null;
     writeSave(save);
-    submitResult(state.name, state.score);
+    const prior = remoteBest != null ? Promise.resolve(remoteBest) : loadRemoteBest();
+    prior.then(async (before) => {
+      const isNew = before != null && dayScore > before;
+      await submitResult(dayName, dayScore);
+      await loadRemoteBest();
+      if (!document.querySelector(".summary-menu")) return;
+      paintRecordPlaque(isNew ? "Новый рекорд" : "Рекорд");
+    });
     roadObserver?.disconnect();
     state.screen = "summary";
     document.getElementById("app").innerHTML = summaryHtml();

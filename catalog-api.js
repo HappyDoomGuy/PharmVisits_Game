@@ -153,33 +153,59 @@ const PLAYERS_TABLE = `CREATE TABLE IF NOT EXISTS players (
   player_id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   name_locked INTEGER NOT NULL DEFAULT 0,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  best INTEGER NOT NULL DEFAULT 0,
+  days INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL DEFAULT 0
 )`;
-const RESULT_SELECT = `SELECT
-  d.identity,
-  d.best,
-  d.days,
-  d.total,
-  COALESCE(
-    p.name,
-    (
-      SELECT player FROM day_results newer
-      WHERE COALESCE(NULLIF(newer.player_id, ''), newer.player_key) = d.identity
-      ORDER BY finished_at DESC, id DESC
-      LIMIT 1
-    )
-  ) AS player
-FROM (
-  SELECT
-    COALESCE(NULLIF(player_id, ''), player_key) AS identity,
-    MAX(score) AS best,
-    COUNT(*) AS days,
-    SUM(score) AS total,
-    MAX(player_id) AS player_id
-  FROM day_results
-  GROUP BY identity
-) d
-LEFT JOIN players p ON p.player_id = d.player_id`;
+const META_TABLE = `CREATE TABLE IF NOT EXISTS app_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+)`;
+const PLAYER_COLUMNS = "player_id, best, days, total, name";
+const BOARD_SPECS = [
+  {
+    id: "points",
+    value: (row) => row.best,
+    top: `SELECT ${PLAYER_COLUMNS} FROM players WHERE days > 0 ORDER BY best DESC, name ASC, player_id ASC LIMIT 20`,
+    ahead: `SELECT COUNT(*) FROM players WHERE days > 0 AND (
+      best > CAST(? AS INTEGER)
+      OR (best = CAST(? AS INTEGER) AND name < ?)
+      OR (best = CAST(? AS INTEGER) AND name = ? AND player_id < ?)
+    )`,
+    aheadArgs: (row) => [row.best, row.best, row.player, row.best, row.player, row.key],
+  },
+  {
+    id: "days",
+    value: (row) => row.days,
+    top: `SELECT ${PLAYER_COLUMNS} FROM players WHERE days > 0 ORDER BY days DESC, best DESC, name ASC, player_id ASC LIMIT 20`,
+    ahead: `SELECT COUNT(*) FROM players WHERE days > 0 AND (
+      days > CAST(? AS INTEGER)
+      OR (days = CAST(? AS INTEGER) AND best > CAST(? AS INTEGER))
+      OR (days = CAST(? AS INTEGER) AND best = CAST(? AS INTEGER) AND name < ?)
+      OR (days = CAST(? AS INTEGER) AND best = CAST(? AS INTEGER) AND name = ? AND player_id < ?)
+    )`,
+    aheadArgs: (row) => [row.days, row.days, row.best, row.days, row.best, row.player, row.days, row.best, row.player, row.key],
+  },
+  {
+    id: "total",
+    value: (row) => row.total,
+    top: `SELECT ${PLAYER_COLUMNS} FROM players WHERE days > 0 ORDER BY total DESC, days DESC, name ASC, player_id ASC LIMIT 20`,
+    ahead: `SELECT COUNT(*) FROM players WHERE days > 0 AND (
+      total > CAST(? AS INTEGER)
+      OR (total = CAST(? AS INTEGER) AND days > CAST(? AS INTEGER))
+      OR (total = CAST(? AS INTEGER) AND days = CAST(? AS INTEGER) AND name < ?)
+      OR (total = CAST(? AS INTEGER) AND days = CAST(? AS INTEGER) AND name = ? AND player_id < ?)
+    )`,
+    aheadArgs: (row) => [row.total, row.total, row.days, row.total, row.days, row.player, row.total, row.days, row.player, row.key],
+  },
+];
+const BOARD_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS players_board_best ON players (best DESC, name, player_id) WHERE days > 0",
+  "CREATE INDEX IF NOT EXISTS players_board_days ON players (days DESC, best DESC, name, player_id) WHERE days > 0",
+  "CREATE INDEX IF NOT EXISTS players_board_total ON players (total DESC, days DESC, name, player_id) WHERE days > 0",
+];
+let resultsReady = false;
 
 function cleanPlayer(name) {
   return String(name || "").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, 24);
@@ -196,18 +222,28 @@ function cleanPlayerId(value) {
 }
 
 async function ensureResults() {
+  if (resultsReady) return;
   await turso([{ sql: RESULT_TABLE }, { sql: RESULT_INDEX }]);
   const info = await turso([{ sql: "PRAGMA table_info(day_results)" }]);
   const names = tableRows(info).map((cells) => String(cells[1]));
   if (!names.includes("player_id")) {
     await turso([{ sql: "ALTER TABLE day_results ADD COLUMN player_id TEXT" }]);
   }
-  await turso([{ sql: RESULT_PLAYER_INDEX }, { sql: PLAYERS_TABLE }]);
+  await turso([{ sql: RESULT_PLAYER_INDEX }, { sql: PLAYERS_TABLE }, { sql: META_TABLE }]);
   const players = await turso([{ sql: "PRAGMA table_info(players)" }]);
   const playerColumns = tableRows(players).map((cells) => String(cells[1]));
   if (!playerColumns.includes("name_locked")) {
     await turso([{ sql: "ALTER TABLE players ADD COLUMN name_locked INTEGER NOT NULL DEFAULT 0" }]);
   }
+  const addedStats = [];
+  if (!playerColumns.includes("best")) addedStats.push("ALTER TABLE players ADD COLUMN best INTEGER NOT NULL DEFAULT 0");
+  if (!playerColumns.includes("days")) addedStats.push("ALTER TABLE players ADD COLUMN days INTEGER NOT NULL DEFAULT 0");
+  if (!playerColumns.includes("total")) addedStats.push("ALTER TABLE players ADD COLUMN total INTEGER NOT NULL DEFAULT 0");
+  if (addedStats.length) await turso(addedStats.map((sql) => ({ sql })));
+  const ready = await turso([{ sql: "SELECT value FROM app_meta WHERE key = 'player_stats'" }]);
+  if (!tableRows(ready).length) await backfillPlayerStats();
+  await turso(BOARD_INDEXES.map((sql) => ({ sql })));
+  resultsReady = true;
 }
 
 function cleanScore(value) {
@@ -229,39 +265,82 @@ function tableRows(results) {
   return found;
 }
 
-function byName(left, right) {
-  return left.player.localeCompare(right.player, "ru");
-}
-
-function packBoard(sorted, valueOf, key) {
-  const ranked = sorted.map((row, index) => ({
-    name: row.player,
-    value: valueOf(row),
-    rank: index + 1,
-    you: Boolean(key) && row.key === key,
-  }));
-  const top = ranked.slice(0, 20);
-  const mine = ranked.find((row) => row.you);
-  if (mine && mine.rank > 20) top.push(mine);
-  return top;
-}
-
-async function readBoards(query) {
-  await ensureResults();
-  const results = await turso([{ sql: RESULT_SELECT }]);
-  const rows = tableRows(results).map((cells) => ({
+function mapPlayerRows(cellsRows) {
+  return cellsRows.map((cells) => ({
     key: String(cells[0] || ""),
     best: Number(cells[1]) || 0,
     days: Number(cells[2]) || 0,
     total: Number(cells[3]) || 0,
     player: String(cells[4] || ""),
-  })).filter((row) => row.player);
-  const key = cleanPlayerId(query && query.player) || playerKey(query && query.name);
-  return {
-    points: packBoard(rows.slice().sort((a, b) => b.best - a.best || byName(a, b)), (row) => row.best, key),
-    days: packBoard(rows.slice().sort((a, b) => b.days - a.days || b.best - a.best || byName(a, b)), (row) => row.days, key),
-    total: packBoard(rows.slice().sort((a, b) => b.total - a.total || b.days - a.days || byName(a, b)), (row) => row.total, key),
-  };
+  })).filter((row) => row.key && row.player);
+}
+
+function boardEntries(rows, valueOf, key, extra) {
+  const ranked = rows.map((row, index) => ({
+    name: row.player,
+    value: valueOf(row),
+    rank: index + 1,
+    you: Boolean(key) && row.key === key,
+  }));
+  if (extra && !ranked.some((row) => row.you)) ranked.push(extra);
+  return ranked;
+}
+
+async function backfillPlayerStats() {
+  const results = await turso([{
+    sql: `SELECT player_id, MAX(score), COUNT(*), SUM(score)
+      FROM day_results
+      WHERE player_id IS NOT NULL AND player_id != ''
+      GROUP BY player_id`,
+  }]);
+  const updates = tableRows(results).map((cells) => ({
+    sql: "UPDATE players SET best = ?, days = ?, total = ? WHERE player_id = ?",
+    args: [cells[1], cells[2], cells[3], cells[0]],
+  }));
+  updates.push({
+    sql: "INSERT INTO app_meta (key, value) VALUES ('player_stats', '1') ON CONFLICT(key) DO UPDATE SET value = '1'",
+  });
+  await turso(updates);
+}
+
+async function readBoards(query) {
+  await ensureResults();
+  const key = cleanPlayerId(query && query.player);
+  const statements = BOARD_SPECS.map((board) => ({ sql: board.top }));
+  if (key) {
+    statements.push({
+      sql: `SELECT ${PLAYER_COLUMNS} FROM players WHERE player_id = ? AND days > 0`,
+      args: [key],
+    });
+  }
+  const results = await turso(statements);
+  const lists = BOARD_SPECS.map((_, index) => mapPlayerRows(tableRows([results[index]])));
+  const mine = key ? mapPlayerRows(tableRows([results[BOARD_SPECS.length]]))[0] : null;
+  const missing = mine
+    ? BOARD_SPECS.map((board, index) => !lists[index].some((row) => row.key === key))
+    : BOARD_SPECS.map(() => false);
+  let ahead = BOARD_SPECS.map(() => 0);
+  if (mine && missing.some(Boolean)) {
+    const counted = await turso(BOARD_SPECS.filter((_, index) => missing[index]).map((board) => ({
+      sql: board.ahead,
+      args: board.aheadArgs(mine),
+    })));
+    let cursor = 0;
+    ahead = missing.map((needsRank) => {
+      if (!needsRank) return 0;
+      const count = Number(tableRows([counted[cursor]])[0]?.[0]) || 0;
+      cursor += 1;
+      return count;
+    });
+  }
+  const packed = {};
+  BOARD_SPECS.forEach((board, index) => {
+    const extra = mine && missing[index]
+      ? { name: mine.player, value: board.value(mine), rank: ahead[index] + 1, you: true }
+      : null;
+    packed[board.id] = boardEntries(lists[index], board.value, key, extra);
+  });
+  return packed;
 }
 
 async function readPlayer(playerId) {
@@ -291,27 +370,34 @@ async function savePlayer(playerId, player) {
 
 async function writeResult(player, score, playerId) {
   const saved = await savePlayer(playerId, player);
-  await turso([{
-    sql: "INSERT INTO day_results (player, player_key, score, finished_at, player_id) VALUES (?, ?, ?, ?, ?)",
-    args: [saved.name, playerKey(saved.name), score, new Date().toISOString(), playerId],
-  }]);
+  const now = new Date().toISOString();
+  await turso([
+    {
+      sql: "INSERT INTO day_results (player, player_key, score, finished_at, player_id) VALUES (?, ?, ?, ?, ?)",
+      args: [saved.name, playerKey(saved.name), score, now, playerId],
+    },
+    {
+      sql: `UPDATE players
+        SET best = MAX(best, CAST(? AS INTEGER)),
+            days = days + 1,
+            total = total + CAST(? AS INTEGER),
+            updated_at = ?
+        WHERE player_id = ?`,
+      args: [score, score, now, playerId],
+    },
+  ]);
   return saved;
 }
 
 const PLAYER_LIST = `SELECT
-  p.player_id,
-  p.name,
-  COALESCE(p.name_locked, 0),
-  COALESCE(s.days, 0),
-  COALESCE(s.best, 0),
-  COALESCE(s.total, 0)
-FROM players p
-LEFT JOIN (
-  SELECT player_id, COUNT(*) AS days, MAX(score) AS best, SUM(score) AS total
-  FROM day_results
-  GROUP BY player_id
-) s ON s.player_id = p.player_id
-ORDER BY p.name COLLATE NOCASE`;
+  player_id,
+  name,
+  COALESCE(name_locked, 0),
+  COALESCE(days, 0),
+  COALESCE(best, 0),
+  COALESCE(total, 0)
+FROM players
+ORDER BY name COLLATE NOCASE`;
 
 async function listPlayers() {
   await ensureResults();
@@ -374,12 +460,18 @@ async function handlePlayers(method, token, body) {
       if (!playerId) return { status: 400, json: { error: "Нужен участник." } };
       const existing = await readPlayer(playerId);
       if (!existing) return { status: 404, json: { error: "Участник не найден." } };
-      await turso([{ sql: "DELETE FROM day_results WHERE player_id = ?", args: [playerId] }]);
+      await turso([
+        { sql: "DELETE FROM day_results WHERE player_id = ?", args: [playerId] },
+        { sql: "UPDATE players SET best = 0, days = 0, total = 0 WHERE player_id = ?", args: [playerId] },
+      ]);
       return { status: 200, json: { ok: true } };
     }
     if (action === "delete-all") {
       await ensureResults();
-      await turso([{ sql: "DELETE FROM day_results" }]);
+      await turso([
+        { sql: "DELETE FROM day_results" },
+        { sql: "UPDATE players SET best = 0, days = 0, total = 0" },
+      ]);
       return { status: 200, json: { ok: true } };
     }
     return { status: 400, json: { error: "Неизвестное действие." } };
